@@ -1,0 +1,23 @@
+// Reemplaza estos valores con los de TU proyecto de Firebase.
+// Los encuentras en: Firebase Console → Configuración del proyecto → "Tus apps" → SDK de configuración.
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBox7xEiINl4KtfV678PwVCHI0S2XTdxbQ",
+  authDomain: "sismo-96d47.firebaseapp.com",
+  projectId: "sismo-96d47",
+  storageBucket: "sismo-96d47.firebasestorage.app",
+  messagingSenderId: "284077530313",
+  appId: "1:284077530313:web:c57a5819e18035add68118",
+  measurementId: "G-2LEGQH6JLV"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
