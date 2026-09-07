@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Solo usuarios autenticados (voluntarios/coordinadores creados en Firebase Authentication)
+    // pueden leer y escribir. Nadie más tiene acceso, ni siquiera de lectura.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
