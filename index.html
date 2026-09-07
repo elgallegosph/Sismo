@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Registro de Damnificados — Sismo 10 de agosto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ===================== PANTALLA DE INGRESO ===================== -->
+  <section id="login-screen" class="login-screen">
+    <div class="login-card">
+      <p class="login-eyebrow">Registro de damnificados</p>
+      <h1 class="login-title">Sismo 10 de agosto</h1>
+      <p class="login-sub">Ingresa con la cuenta que te asignó el coordinador de la brigada.</p>
+      <form id="login-form" class="login-form">
+        <label>
+          Correo
+          <input type="email" id="login-email" required autocomplete="username" />
+        </label>
+        <label>
+          Contraseña
+          <input type="password" id="login-password" required autocomplete="current-password" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+        <p id="login-error" class="form-error" hidden></p>
+      </form>
+      <p class="login-footnote">¿No tienes cuenta? Pídele al coordinador que te cree un usuario desde el panel de Firebase.</p>
+    </div>
+  </section>
+
+  <!-- ===================== APP PRINCIPAL ===================== -->
+  <div id="app-shell" class="app-shell" hidden>
+
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <p class="brand-eyebrow">Respuesta a emergencia</p>
+        <h1 class="brand-title">Sismo<br/>10 de agosto</h1>
+      </div>
+      <nav class="nav">
+        <button class="nav-item is-active" data-panel="panel-damnificados">Damnificados</button>
+        <button class="nav-item" data-panel="panel-inventario">Inventario</button>
+        <button class="nav-item" data-panel="panel-movimientos">Entradas y salidas</button>
+        <button class="nav-item" data-panel="panel-reportes">Entregas por persona</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <p class="session-user">Sesión: <span id="session-email">—</span></p>
+        <button id="logout-btn" class="btn btn-ghost btn-block">Salir</button>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <!-- ---------- DAMNIFICADOS ---------- -->
+      <section id="panel-damnificados" class="panel is-active">
+        <header class="panel-header">
+          <div>
+            <h2>Damnificados</h2>
+            <p class="panel-hint"><span class="live-dot"></span>Se actualiza en vivo para todos los que estén conectados.</p>
+          </div>
+          <button class="btn btn-primary" data-open-modal="modal-damnificado">Registrar damnificado</button>
+        </header>
+
+        <input type="search" id="buscar-damnificado" class="search-input" placeholder="Buscar por nombre, cédula o RUD…" />
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Cédula</th>
+                <th>RUD</th>
+                <th>Teléfono</th>
+                <th>Mercados entregados</th>
+                <th>Materiales entregados</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-damnificados">
+              <tr class="empty-row"><td colspan="7">Cargando registros…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ---------- INVENTARIO ---------- -->
+      <section id="panel-inventario" class="panel">
+        <header class="panel-header">
+          <div>
+            <h2>Inventario</h2>
+            <p class="panel-hint">Existencias actuales de mercados y materiales.</p>
+          </div>
+          <button class="btn btn-primary" data-open-modal="modal-item">Agregar artículo</button>
+        </header>
+
+        <div class="inventory-columns">
+          <div>
+            <h3 class="inventory-subtitle">Mercados</h3>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Artículo</th><th>Unidad</th><th>Stock</th><th></th></tr></thead>
+                <tbody id="tabla-inventario-mercado"><tr class="empty-row"><td colspan="4">Cargando…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h3 class="inventory-subtitle">Materiales</h3>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Artículo</th><th>Unidad</th><th>Stock</th><th></th></tr></thead>
+                <tbody id="tabla-inventario-material"><tr class="empty-row"><td colspan="4">Cargando…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- MOVIMIENTOS ---------- -->
+      <section id="panel-movimientos" class="panel">
+        <header class="panel-header">
+          <div>
+            <h2>Entradas y salidas</h2>
+            <p class="panel-hint">Toda salida queda asociada a un damnificado.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary" data-open-modal="modal-entrada">Registrar entrada</button>
+            <button class="btn btn-primary" data-open-modal="modal-salida">Registrar entrega (salida)</button>
+          </div>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Categoría</th>
+                <th>Artículo</th>
+                <th>Cantidad</th>
+                <th>Entregado a</th>
+                <th>Responsable</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-movimientos">
+              <tr class="empty-row"><td colspan="7">Cargando movimientos…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ---------- REPORTES ---------- -->
+      <section id="panel-reportes" class="panel">
+        <header class="panel-header">
+          <div>
+            <h2>Entregas por persona</h2>
+            <p class="panel-hint">Busca a alguien para ver cuántas veces ha recibido mercados o materiales.</p>
+          </div>
+        </header>
+
+        <input type="search" id="buscar-reporte" class="search-input" placeholder="Buscar por nombre, cédula o RUD…" />
+
+        <div id="reporte-resultado" class="reporte-resultado">
+          <p class="empty-state">Escribe un nombre, cédula o RUD para ver su historial de entregas.</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===================== MODALES ===================== -->
+
+  <div class="modal-overlay" id="modal-damnificado" hidden>
+    <div class="modal">
+      <h3>Registrar damnificado</h3>
+      <form id="form-damnificado" class="modal-form">
+        <input type="hidden" id="damnificado-id" />
+        <label>Nombre completo <input type="text" id="damnificado-nombre" required /></label>
+        <label>Cédula <input type="text" id="damnificado-cedula" required /></label>
+        <label>RUD <input type="text" id="damnificado-rud" required /></label>
+        <label>Teléfono <input type="text" id="damnificado-telefono" /></label>
+        <label>Dirección / albergue <input type="text" id="damnificado-direccion" /></label>
+        <label>Personas a cargo <input type="number" min="1" id="damnificado-personas" /></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+        <p class="form-error" hidden></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-item" hidden>
+    <div class="modal">
+      <h3>Agregar artículo al inventario</h3>
+      <form id="form-item" class="modal-form">
+        <label>Categoría
+          <select id="item-categoria" required>
+            <option value="mercado">Mercado</option>
+            <option value="material">Material</option>
+          </select>
+        </label>
+        <label>Nombre del artículo <input type="text" id="item-nombre" required /></label>
+        <label>Unidad de medida <input type="text" id="item-unidad" placeholder="kg, caja, unidad…" required /></label>
+        <label>Stock inicial <input type="number" min="0" step="any" id="item-stock" value="0" required /></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+        <p class="form-error" hidden></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-entrada" hidden>
+    <div class="modal">
+      <h3>Registrar entrada de donación</h3>
+      <form id="form-entrada" class="modal-form">
+        <label>Categoría
+          <select id="entrada-categoria" required>
+            <option value="mercado">Mercado</option>
+            <option value="material">Material</option>
+          </select>
+        </label>
+        <label>Artículo
+          <select id="entrada-item" required></select>
+        </label>
+        <label>Cantidad <input type="number" min="0.01" step="any" id="entrada-cantidad" required /></label>
+        <label>Donante / procedencia (opcional) <input type="text" id="entrada-procedencia" /></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar entrada</button>
+        </div>
+        <p class="form-error" hidden></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-salida" hidden>
+    <div class="modal">
+      <h3>Registrar entrega</h3>
+      <form id="form-salida" class="modal-form">
+        <label>Damnificado
+          <input type="text" id="salida-buscar-damnificado" placeholder="Buscar por nombre o cédula…" autocomplete="off" />
+        </label>
+        <div id="salida-damnificado-resultados" class="autocomplete-results"></div>
+        <input type="hidden" id="salida-damnificado-id" required />
+        <p id="salida-damnificado-elegido" class="chosen-note" hidden></p>
+
+        <label>Categoría
+          <select id="salida-categoria" required>
+            <option value="mercado">Mercado</option>
+            <option value="material">Material</option>
+          </select>
+        </label>
+        <label>Artículo
+          <select id="salida-item" required></select>
+        </label>
+        <label>Cantidad <input type="number" min="0.01" step="any" id="salida-cantidad" required /></label>
+        <p id="salida-stock-info" class="chosen-note"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Registrar entrega</button>
+        </div>
+        <p class="form-error" hidden></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
