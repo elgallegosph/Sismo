@@ -1,5 +1,3 @@
-// Reemplaza estos valores con los de TU proyecto de Firebase.
-// Los encuentras en: Firebase Console → Configuración del proyecto → "Tus apps" → SDK de configuración.
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
