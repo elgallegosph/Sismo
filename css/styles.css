@@ -1,3 +1,6 @@
+[hidden] {
+  display: none !important;
+}
 :root {
   --color-bg: #E9EDEC;
   --color-surface: #FFFFFF;
