@@ -1,5 +1,5 @@
 export const firebaseConfig = {
-  apiKey: "AIzaSyBox7xEiIINl4KtfV678PwVCHI0S2XTdxbQ",
+  apiKey: "AIzaSyBox7xEiINl4KtfV678PwVCHI0S2XTdxbQ",
   authDomain: "sismo-96d47.firebaseapp.com",
   projectId: "sismo-96d47",
   storageBucket: "sismo-96d47.firebasestorage.app",
