@@ -514,4 +514,84 @@ function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
+// ============================================================
+// IMPORTAR DAMNIFICADOS DESDE EXCEL
+// ============================================================
+import { writeBatch } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const btnImportar = document.getElementById("btn-importar-excel");
+const inputExcel = document.getElementById("input-excel");
+
+btnImportar.addEventListener("click", () => inputExcel.click());
+
+inputExcel.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const libro = XLSX.read(buffer, { type: "array" });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+
+    if (filas.length === 0) {
+      mostrarToast("El archivo no tiene filas de datos.", true);
+      return;
+    }
+
+    const buscarColumna = (fila, opciones) => {
+      const claves = Object.keys(fila);
+      for (const opcion of opciones) {
+        const encontrada = claves.find(
+          (k) => k.trim().toLowerCase() === opcion
+        );
+        if (encontrada) return fila[encontrada];
+      }
+      return "";
+    };
+
+    const registros = filas.map((fila) => ({
+      nombre: String(buscarColumna(fila, ["nombre", "nombre completo"])).trim(),
+      cedula: String(buscarColumna(fila, ["cedula", "cédula", "cc"])).trim(),
+      rud: String(buscarColumna(fila, ["rud"])).trim(),
+      telefono: String(buscarColumna(fila, ["telefono", "teléfono", "celular"])).trim(),
+      direccion: String(buscarColumna(fila, ["direccion", "dirección", "albergue"])).trim(),
+    })).filter((r) => r.nombre && r.cedula);
+
+    const omitidos = filas.length - registros.length;
+
+    if (registros.length === 0) {
+      mostrarToast("Ninguna fila tiene nombre y cédula válidos.", true);
+      return;
+    }
+
+    if (!confirm(`Se van a importar ${registros.length} damnificados${omitidos ? ` (se omiten ${omitidos} filas sin nombre o cédula)` : ""}. ¿Continuar?`)) {
+      inputExcel.value = "";
+      return;
+    }
+
+    // Firestore permite máximo 500 operaciones por lote
+    const LOTE = 400;
+    for (let i = 0; i < registros.length; i += LOTE) {
+      const batch = writeBatch(db);
+      registros.slice(i, i + LOTE).forEach((r) => {
+        const ref = doc(collection(db, "damnificados"));
+        batch.set(ref, {
+          ...r,
+          personas: 1,
+          fechaRegistro: serverTimestamp(),
+          registradoPor: auth.currentUser.email,
+        });
+      });
+      await batch.commit();
+    }
+
+    mostrarToast(`${registros.length} damnificados importados correctamente.`);
+  } catch (err) {
+    console.error(err);
+    mostrarToast("No se pudo leer el archivo. Verifica que sea un Excel o CSV válido.", true);
+  } finally {
+    inputExcel.value = "";
+  }
+});
 }
