@@ -62,9 +62,11 @@
             <h2>Damnificados</h2>
             <p class="panel-hint"><span class="live-dot"></span>Se actualiza en vivo para todos los que estén conectados.</p>
           </div>
-          <button class="btn btn-primary" data-open-modal="modal-damnificado">Registrar damnificado</button>
-<button class="btn btn-secondary" id="btn-importar-excel">Importar Excel</button>
-<input type="file" id="input-excel" accept=".xlsx,.xls,.csv" hidden />
+          <div class="header-actions">
+            <button class="btn btn-secondary" id="btn-importar-excel">Importar Excel</button>
+            <button class="btn btn-primary" data-open-modal="modal-damnificado">Registrar damnificado</button>
+          </div>
+          <input type="file" id="input-excel" accept=".xlsx,.xls,.csv" hidden />
         </header>
 
         <input type="search" id="buscar-damnificado" class="search-input" placeholder="Buscar por nombre, cédula o RUD…" />
@@ -176,16 +178,56 @@
   <!-- ===================== MODALES ===================== -->
 
   <div class="modal-overlay" id="modal-damnificado" hidden>
-    <div class="modal">
+    <div class="modal modal-wide">
       <h3>Registrar damnificado</h3>
       <form id="form-damnificado" class="modal-form">
         <input type="hidden" id="damnificado-id" />
+
+        <h4 class="modal-section">Datos personales</h4>
         <label>Nombre completo <input type="text" id="damnificado-nombre" required /></label>
         <label>Cédula <input type="text" id="damnificado-cedula" required /></label>
         <label>RUD <input type="text" id="damnificado-rud" required /></label>
         <label>Teléfono <input type="text" id="damnificado-telefono" /></label>
-        <label>Dirección / albergue <input type="text" id="damnificado-direccion" /></label>
-        <label>Personas a cargo <input type="number" min="1" id="damnificado-personas" /></label>
+        <label>Vereda <input type="text" id="damnificado-vereda" /></label>
+        <label>Dirección <input type="text" id="damnificado-direccion" /></label>
+        <label>Formato de RUFE / categoría <input type="text" id="damnificado-rufe" /></label>
+        <label>Formato ingenieros <input type="text" id="damnificado-ingenieros" /></label>
+
+        <h4 class="modal-section">Vivienda</h4>
+        <label>Tipo de bien <input type="text" id="damnificado-tipobien" /></label>
+        <label>Tenencia de la vivienda
+          <select id="damnificado-tenencia">
+            <option value="">Sin especificar</option>
+            <option value="Propia">Propia</option>
+            <option value="Arrendada">Arrendada</option>
+            <option value="No informa">No informa</option>
+          </select>
+        </label>
+
+        <h4 class="modal-section">Núcleo familiar</h4>
+        <label>Habitantes <input type="number" min="0" id="damnificado-habitantes" /></label>
+        <label>Adultos <input type="number" min="0" id="damnificado-adultos" /></label>
+        <label>Menores <input type="number" min="0" id="damnificado-menores" /></label>
+        <label>Edad(es) <input type="text" id="damnificado-edad" placeholder="Ej: 34, 12, 8" /></label>
+        <label>Enfermedades de base <input type="text" id="damnificado-enfermedades" /></label>
+        <label>Afectación en servicios <input type="text" id="damnificado-servicios" placeholder="Agua, luz, gas…" /></label>
+
+        <h4 class="modal-section">Afectaciones</h4>
+        <div class="checkbox-grid">
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-vivienda-techo" /> Vivienda averiada — techo</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-vivienda-pared" /> Vivienda averiada — pared</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-vivienda-pisos" /> Vivienda averiada — pisos</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-vivienda-estructural" /> Vivienda afectada estructuralmente</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-vivienda-colapsada" /> Vivienda colapsada</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-desalojo-firmado" /> Formato de desalojo firmado</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-desalojados" /> Desalojados</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-edif-averiada" /> Edificación averiada</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-edif-estructural" /> Edificación afectada estructuralmente</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-edif-colapsada" /> Edificación colapsada</label>
+          <label class="checkbox-label"><input type="checkbox" id="damnificado-via-afectada" /> Infraestructura vial afectada</label>
+        </div>
+        <label>Otra afectación de vivienda (describir) <input type="text" id="damnificado-vivienda-otro" /></label>
+
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar</button>
@@ -273,9 +315,8 @@
   </div>
 
   <div id="toast" class="toast" hidden></div>
-  
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
