@@ -1,6 +1,7 @@
 [hidden] {
   display: none !important;
 }
+
 :root {
   --color-bg: #E9EDEC;
   --color-surface: #FFFFFF;
@@ -200,6 +201,26 @@ button, input, select { font-family: inherit; font-size: inherit; }
   overflow-y: auto;
 }
 .modal h3 { font-size: 1.15rem; font-weight: 800; margin-bottom: 1.1rem; }
+.modal-wide { max-width: 560px; }
+.modal-section {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+  margin: 1.25rem 0 0.9rem;
+  padding-top: 1rem;
+}
+.modal-form > .modal-section:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.9rem;
+}
+.checkbox-label { display: flex; align-items: center; gap: 0.45rem; font-weight: 500; margin-bottom: 0; }
+.checkbox-label input { width: auto; margin: 0; }
+@media (max-width: 520px) { .checkbox-grid { grid-template-columns: 1fr; } }
 .modal-form label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.9rem; }
 .modal-form input, .modal-form select {
   display: block; width: 100%; margin-top: 0.3rem;
