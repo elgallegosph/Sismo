@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, runTransaction, serverTimestamp, query, orderBy
+  onSnapshot, runTransaction, serverTimestamp, query, orderBy, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -138,8 +138,31 @@ formDamnificado.addEventListener("submit", async (e) => {
     cedula: document.getElementById("damnificado-cedula").value.trim(),
     rud: document.getElementById("damnificado-rud").value.trim(),
     telefono: document.getElementById("damnificado-telefono").value.trim(),
+    vereda: document.getElementById("damnificado-vereda").value.trim(),
     direccion: document.getElementById("damnificado-direccion").value.trim(),
-    personas: Number(document.getElementById("damnificado-personas").value) || 1,
+    categoriaRufe: document.getElementById("damnificado-rufe").value.trim(),
+    formatoIngenieros: document.getElementById("damnificado-ingenieros").value.trim(),
+    tipoBien: document.getElementById("damnificado-tipobien").value.trim(),
+    tenenciaVivienda: document.getElementById("damnificado-tenencia").value,
+    habitantes: Number(document.getElementById("damnificado-habitantes").value) || 0,
+    adultos: Number(document.getElementById("damnificado-adultos").value) || 0,
+    menores: Number(document.getElementById("damnificado-menores").value) || 0,
+    edad: document.getElementById("damnificado-edad").value.trim(),
+    enfermedadesBase: document.getElementById("damnificado-enfermedades").value.trim(),
+    afectacionServicios: document.getElementById("damnificado-servicios").value.trim(),
+    viviendaAveriadaTecho: document.getElementById("damnificado-vivienda-techo").checked,
+    viviendaAveriadaPared: document.getElementById("damnificado-vivienda-pared").checked,
+    viviendaAveriadaPisos: document.getElementById("damnificado-vivienda-pisos").checked,
+    viviendaAveriadaOtro: document.getElementById("damnificado-vivienda-otro").value.trim(),
+    viviendaAfectadaEstructural: document.getElementById("damnificado-vivienda-estructural").checked,
+    viviendaColapsada: document.getElementById("damnificado-vivienda-colapsada").checked,
+    formatoDesalojoFirmado: document.getElementById("damnificado-desalojo-firmado").checked,
+    desalojados: document.getElementById("damnificado-desalojados").checked,
+    edificacionAveriada: document.getElementById("damnificado-edif-averiada").checked,
+    edificacionAfectadaEstructural: document.getElementById("damnificado-edif-estructural").checked,
+    edificacionColapsada: document.getElementById("damnificado-edif-colapsada").checked,
+    infraestructuraVialAfectada: document.getElementById("damnificado-via-afectada").checked,
+    personas: Number(document.getElementById("damnificado-habitantes").value) || 1,
   };
   try {
     const id = document.getElementById("damnificado-id").value;
@@ -206,8 +229,30 @@ function abrirEdicionDamnificado(id) {
   document.getElementById("damnificado-cedula").value = d.cedula || "";
   document.getElementById("damnificado-rud").value = d.rud || "";
   document.getElementById("damnificado-telefono").value = d.telefono || "";
+  document.getElementById("damnificado-vereda").value = d.vereda || "";
   document.getElementById("damnificado-direccion").value = d.direccion || "";
-  document.getElementById("damnificado-personas").value = d.personas || 1;
+  document.getElementById("damnificado-rufe").value = d.categoriaRufe || "";
+  document.getElementById("damnificado-ingenieros").value = d.formatoIngenieros || "";
+  document.getElementById("damnificado-tipobien").value = d.tipoBien || "";
+  document.getElementById("damnificado-tenencia").value = d.tenenciaVivienda || "";
+  document.getElementById("damnificado-habitantes").value = d.habitantes || "";
+  document.getElementById("damnificado-adultos").value = d.adultos || "";
+  document.getElementById("damnificado-menores").value = d.menores || "";
+  document.getElementById("damnificado-edad").value = d.edad || "";
+  document.getElementById("damnificado-enfermedades").value = d.enfermedadesBase || "";
+  document.getElementById("damnificado-servicios").value = d.afectacionServicios || "";
+  document.getElementById("damnificado-vivienda-techo").checked = !!d.viviendaAveriadaTecho;
+  document.getElementById("damnificado-vivienda-pared").checked = !!d.viviendaAveriadaPared;
+  document.getElementById("damnificado-vivienda-pisos").checked = !!d.viviendaAveriadaPisos;
+  document.getElementById("damnificado-vivienda-otro").value = d.viviendaAveriadaOtro || "";
+  document.getElementById("damnificado-vivienda-estructural").checked = !!d.viviendaAfectadaEstructural;
+  document.getElementById("damnificado-vivienda-colapsada").checked = !!d.viviendaColapsada;
+  document.getElementById("damnificado-desalojo-firmado").checked = !!d.formatoDesalojoFirmado;
+  document.getElementById("damnificado-desalojados").checked = !!d.desalojados;
+  document.getElementById("damnificado-edif-averiada").checked = !!d.edificacionAveriada;
+  document.getElementById("damnificado-edif-estructural").checked = !!d.edificacionAfectadaEstructural;
+  document.getElementById("damnificado-edif-colapsada").checked = !!d.edificacionColapsada;
+  document.getElementById("damnificado-via-afectada").checked = !!d.infraestructuraVialAfectada;
   document.getElementById("modal-damnificado").hidden = false;
 }
 
@@ -514,15 +559,65 @@ function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
+}
+
 // ============================================================
 // IMPORTAR DAMNIFICADOS DESDE EXCEL
 // ============================================================
-import { writeBatch } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
 const btnImportar = document.getElementById("btn-importar-excel");
 const inputExcel = document.getElementById("input-excel");
 
 btnImportar.addEventListener("click", () => inputExcel.click());
+
+// Cada dato reconoce varios posibles nombres de columna (sin importar tildes/mayúsculas).
+const MAPA_COLUMNAS = {
+  nombre: ["nombre y apellidos completos", "nombre completo", "nombre"],
+  cedula: ["cedula ciudadania", "cedula", "cédula", "cc"],
+  telefono: ["telefono", "teléfono", "celular"],
+  vereda: ["vereda"],
+  direccion: ["direccion", "dirección", "albergue"],
+  rud: ["r.u.d", "rud"],
+  categoriaRufe: ["formato de rufe", "categoria según rufe", "categoria rufe"],
+  formatoIngenieros: ["formato ingenieros"],
+  tipoBien: ["tipo de bien"],
+  tenenciaVivienda: ["tenencia vivienda", "propia", "arrendada", "no informe", "no informa"],
+  habitantes: ["habitantes"],
+  adultos: ["adultos"],
+  menores: ["menores"],
+  edad: ["edad"],
+  enfermedadesBase: ["enfermedades de base"],
+  afectacionServicios: ["afectacion en servicios", "afectación en servicios"],
+  viviendaAveriadaTecho: ["techo"],
+  viviendaAveriadaPared: ["pared"],
+  viviendaAveriadaPisos: ["pisos"],
+  viviendaAveriadaOtro: ["otro"],
+  formatoDesalojoFirmado: ["formato de desalojo", "firmado"],
+  desalojados: ["desalojados"],
+  viviendaAfectadaEstructural: ["viviendas afectadas estructuralmente", "vivienda afectada estructuralmente"],
+  viviendaColapsada: ["viviendas colapsadas", "vivienda colapsada"],
+  edificacionAveriada: ["edificaciones averiadas", "edificacion averiada"],
+  edificacionAfectadaEstructural: ["edificaciones afectadas estructuralmente", "edificacion afectada estructuralmente"],
+  edificacionColapsada: ["edificaciones colapsadas", "edificacion colapsada"],
+  infraestructuraVialAfectada: ["infraestructural víal afectada", "infraestructura vial afectada"],
+};
+
+const CAMPOS_TEXTO = ["nombre", "cedula", "telefono", "vereda", "direccion", "rud", "categoriaRufe", "formatoIngenieros", "tipoBien", "tenenciaVivienda", "edad", "enfermedadesBase", "afectacionServicios", "viviendaAveriadaOtro"];
+const CAMPOS_NUMERO = ["habitantes", "adultos", "menores"];
+const CAMPOS_SINO = ["viviendaAveriadaTecho", "viviendaAveriadaPared", "viviendaAveriadaPisos", "formatoDesalojoFirmado", "desalojados", "viviendaAfectadaEstructural", "viviendaColapsada", "edificacionAveriada", "edificacionAfectadaEstructural", "edificacionColapsada", "infraestructuraVialAfectada"];
+
+function buscarColumna(fila, opciones) {
+  const claves = Object.keys(fila);
+  for (const opcion of opciones) {
+    const encontrada = claves.find((k) => k.trim().toLowerCase() === opcion);
+    if (encontrada) return fila[encontrada];
+  }
+  return "";
+}
+
+function esAfirmativo(valor) {
+  const v = String(valor ?? "").trim().toLowerCase();
+  return ["si", "sí", "x", "1", "true", "verdadero"].includes(v);
+}
 
 inputExcel.addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -539,24 +634,20 @@ inputExcel.addEventListener("change", async (e) => {
       return;
     }
 
-    const buscarColumna = (fila, opciones) => {
-      const claves = Object.keys(fila);
-      for (const opcion of opciones) {
-        const encontrada = claves.find(
-          (k) => k.trim().toLowerCase() === opcion
-        );
-        if (encontrada) return fila[encontrada];
+    const registros = filas.map((fila) => {
+      const registro = {};
+      for (const campo of CAMPOS_TEXTO) {
+        registro[campo] = String(buscarColumna(fila, MAPA_COLUMNAS[campo])).trim();
       }
-      return "";
-    };
-
-    const registros = filas.map((fila) => ({
-      nombre: String(buscarColumna(fila, ["nombre", "nombre completo"])).trim(),
-      cedula: String(buscarColumna(fila, ["cedula", "cédula", "cc"])).trim(),
-      rud: String(buscarColumna(fila, ["rud"])).trim(),
-      telefono: String(buscarColumna(fila, ["telefono", "teléfono", "celular"])).trim(),
-      direccion: String(buscarColumna(fila, ["direccion", "dirección", "albergue"])).trim(),
-    })).filter((r) => r.nombre && r.cedula);
+      for (const campo of CAMPOS_NUMERO) {
+        registro[campo] = Number(buscarColumna(fila, MAPA_COLUMNAS[campo])) || 0;
+      }
+      for (const campo of CAMPOS_SINO) {
+        registro[campo] = esAfirmativo(buscarColumna(fila, MAPA_COLUMNAS[campo]));
+      }
+      registro.personas = registro.habitantes || 1;
+      return registro;
+    }).filter((r) => r.nombre && r.cedula);
 
     const omitidos = filas.length - registros.length;
 
@@ -570,15 +661,13 @@ inputExcel.addEventListener("change", async (e) => {
       return;
     }
 
-    // Firestore permite máximo 500 operaciones por lote
-    const LOTE = 400;
+    const LOTE = 400; // Firestore permite máximo 500 operaciones por lote
     for (let i = 0; i < registros.length; i += LOTE) {
       const batch = writeBatch(db);
       registros.slice(i, i + LOTE).forEach((r) => {
         const ref = doc(collection(db, "damnificados"));
         batch.set(ref, {
           ...r,
-          personas: 1,
           fechaRegistro: serverTimestamp(),
           registradoPor: auth.currentUser.email,
         });
@@ -594,4 +683,3 @@ inputExcel.addEventListener("change", async (e) => {
     inputExcel.value = "";
   }
 });
-}
