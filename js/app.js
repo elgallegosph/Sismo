@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc,
   onSnapshot, runTransaction, serverTimestamp, query, orderBy, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -40,17 +40,53 @@ loginForm.addEventListener("submit", async (e) => {
 
 document.getElementById("logout-btn").addEventListener("click", () => signOut(auth));
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (user) {
     loginScreen.hidden = true;
     appShell.hidden = false;
     document.getElementById("session-email").textContent = user.email;
+    await cargarRol(user);
     iniciarListeners();
   } else {
     loginScreen.hidden = false;
     appShell.hidden = true;
+    rolActual = null;
   }
 });
+
+// ============================================================
+// ROLES Y PERMISOS
+// ============================================================
+let rolActual = "consulta"; // valor por defecto más restrictivo, hasta confirmar el real
+
+async function cargarRol(user) {
+  try {
+    const snap = await getDoc(doc(db, "usuarios", user.uid));
+    rolActual = snap.exists() ? (snap.data().rol || "consulta") : "consulta";
+    if (!snap.exists()) {
+      mostrarToast("Tu usuario no tiene un rol asignado todavía. Pídele al administrador que te lo configure. Por ahora solo puedes consultar.", true);
+    }
+  } catch (err) {
+    rolActual = "consulta";
+  }
+  document.getElementById("session-rol").textContent =
+    { admin: "Administrador", inventario: "Inventario", consulta: "Solo consulta" }[rolActual] || rolActual;
+  aplicarPermisos();
+}
+
+function aplicarPermisos() {
+  const puedeEditarDamnificados = rolActual === "admin";
+  const puedeInventario = rolActual === "admin" || rolActual === "inventario";
+
+  document.getElementById("btn-importar-excel").hidden = !puedeEditarDamnificados;
+  document.getElementById("btn-registrar-damnificado").hidden = !puedeEditarDamnificados;
+  document.getElementById("btn-agregar-item").hidden = !puedeInventario;
+  document.getElementById("btn-registrar-entrada").hidden = !puedeInventario;
+  document.getElementById("btn-registrar-salida").hidden = !puedeInventario;
+
+  renderDamnificados();
+  renderInventario();
+}
 
 // ============================================================
 // NAVEGACIÓN ENTRE PANELES
@@ -212,7 +248,7 @@ function renderDamnificados() {
       <td>${escapeHtml(d.telefono || "—")}</td>
       <td><span class="badge badge-count">${contarEntregas(d.id, "mercado")}</span></td>
       <td><span class="badge badge-count">${contarEntregas(d.id, "material")}</span></td>
-      <td><button class="btn btn-ghost btn-small" data-editar-damnificado="${d.id}">Editar</button></td>
+      <td>${rolActual === "admin" ? `<button class="btn btn-ghost btn-small" data-editar-damnificado="${d.id}">Editar</button>` : ""}</td>
     </tr>
   `).join("");
 
@@ -304,7 +340,7 @@ function renderTablaInventario(categoria, tbodyId) {
       <td>${escapeHtml(i.nombre)}</td>
       <td>${escapeHtml(i.unidad)}</td>
       <td>${i.stock <= 0 ? `<span class="badge badge-low">0 — agotado</span>` : i.stock}</td>
-      <td><button class="btn btn-ghost btn-small" data-eliminar-item="${i.id}">Eliminar</button></td>
+      <td>${rolActual === "admin" ? `<button class="btn btn-ghost btn-small" data-eliminar-item="${i.id}">Eliminar</button>` : ""}</td>
     </tr>
   `).join("");
 
