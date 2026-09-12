@@ -49,6 +49,7 @@
       </nav>
       <div class="sidebar-bottom">
         <p class="session-user">Sesión: <span id="session-email">—</span></p>
+        <p class="session-user">Rol: <span id="session-rol">—</span></p>
         <button id="logout-btn" class="btn btn-ghost btn-block">Salir</button>
       </div>
     </aside>
@@ -64,7 +65,7 @@
           </div>
           <div class="header-actions">
             <button class="btn btn-secondary" id="btn-importar-excel">Importar Excel</button>
-            <button class="btn btn-primary" data-open-modal="modal-damnificado">Registrar damnificado</button>
+            <button class="btn btn-primary" id="btn-registrar-damnificado" data-open-modal="modal-damnificado">Registrar damnificado</button>
           </div>
           <input type="file" id="input-excel" accept=".xlsx,.xls,.csv" hidden />
         </header>
@@ -98,7 +99,7 @@
             <h2>Inventario</h2>
             <p class="panel-hint">Existencias actuales de mercados y materiales.</p>
           </div>
-          <button class="btn btn-primary" data-open-modal="modal-item">Agregar artículo</button>
+          <button class="btn btn-primary" id="btn-agregar-item" data-open-modal="modal-item">Agregar artículo</button>
         </header>
 
         <div class="inventory-columns">
@@ -131,8 +132,8 @@
             <p class="panel-hint">Toda salida queda asociada a un damnificado.</p>
           </div>
           <div class="header-actions">
-            <button class="btn btn-secondary" data-open-modal="modal-entrada">Registrar entrada</button>
-            <button class="btn btn-primary" data-open-modal="modal-salida">Registrar entrega (salida)</button>
+            <button class="btn btn-secondary" id="btn-registrar-entrada" data-open-modal="modal-entrada">Registrar entrada</button>
+            <button class="btn btn-primary" id="btn-registrar-salida" data-open-modal="modal-salida">Registrar entrega (salida)</button>
           </div>
         </header>
 
