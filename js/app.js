@@ -486,7 +486,7 @@ function buscarPersonasEntregables(filtro) {
         entregadoNombre: d.nombre,
         entregadoDocumento: d.cedula,
         entregadoParentesco: "Jefe de hogar",
-        etiqueta: `${d.nombre} — Jefe de hogar (RUD ${d.rud})`,
+        etiqueta: `${d.nombre} — Jefe de hogar (CC ${d.cedula}, RUD ${d.rud})`,
       });
     }
   });
@@ -506,7 +506,7 @@ function buscarPersonasEntregables(filtro) {
         entregadoNombre: f.nombreCompleto,
         entregadoDocumento: f.numeroDocumento,
         entregadoParentesco: f.parentesco || "Familiar",
-        etiqueta: `${f.nombreCompleto} — ${f.parentesco || "Familiar"} (RUD ${damnificado.rud}, hogar de ${damnificado.nombre})`,
+        etiqueta: `${f.nombreCompleto} — ${f.parentesco || "Familiar"} (Doc. ${f.tipoDocumento || ""} ${f.numeroDocumento || "sin documento"}, RUD ${damnificado.rud}, hogar de ${damnificado.nombre})`,
       });
     }
   });
@@ -543,8 +543,8 @@ buscarSalidaInput.addEventListener("input", () => {
       resultadosSalida.innerHTML = "";
       const nota = document.getElementById("salida-damnificado-elegido");
       nota.textContent = r.entregadoParentesco === "Jefe de hogar"
-        ? `Se entregará a: ${r.entregadoNombre} (Jefe de hogar, RUD ${r.damnificadoRud})`
-        : `Se entregará a: ${r.entregadoNombre} (${r.entregadoParentesco}) — núcleo familiar de ${r.damnificadoNombre}, RUD ${r.damnificadoRud}`;
+        ? `Se entregará a: ${r.entregadoNombre} (CC ${r.entregadoDocumento}) — Jefe de hogar, RUD ${r.damnificadoRud}`
+        : `Se entregará a: ${r.entregadoNombre} (Doc. ${r.entregadoDocumento || "sin documento"}, ${r.entregadoParentesco}) — núcleo familiar de ${r.damnificadoNombre}, RUD ${r.damnificadoRud}`;
       nota.hidden = false;
     });
   });
@@ -621,7 +621,7 @@ function formatEntregadoA(m) {
   if (!m.entregadoNombre || m.entregadoNombre === m.damnificadoNombre) {
     return `${m.damnificadoNombre} (CC ${m.damnificadoCedula})`;
   }
-  return `${m.entregadoNombre} (${m.entregadoParentesco || "Familiar"}) — hogar de ${m.damnificadoNombre}`;
+  return `${m.entregadoNombre} (Doc. ${m.entregadoDocumento || "sin documento"}, ${m.entregadoParentesco || "Familiar"}) — hogar de ${m.damnificadoNombre}`;
 }
 
 function renderMovimientos() {
@@ -648,6 +648,14 @@ function renderMovimientos() {
 // ============================================================
 const buscarReporteInput = document.getElementById("buscar-reporte");
 buscarReporteInput.addEventListener("input", renderReporteSiHayBusqueda);
+
+function formatRecibio(m, damnificadoPrincipal) {
+  const nombre = m.entregadoNombre || damnificadoPrincipal.nombre;
+  const partes = [];
+  if (m.entregadoDocumento) partes.push(`Doc. ${m.entregadoDocumento}`);
+  if (m.entregadoParentesco && m.entregadoParentesco !== "Jefe de hogar") partes.push(m.entregadoParentesco);
+  return partes.length ? `${nombre} (${partes.join(", ")})` : nombre;
+}
 
 function renderReporteSiHayBusqueda() {
   const filtro = buscarReporteInput.value.trim().toLowerCase();
@@ -685,7 +693,7 @@ function renderReporteSiHayBusqueda() {
                       <td>${m.categoria === "mercado" ? "Mercado" : "Material"}</td>
                       <td>${escapeHtml(m.itemNombre)}</td>
                       <td>${m.cantidad}</td>
-                      <td>${escapeHtml(m.entregadoNombre || d.nombre)}${m.entregadoParentesco && m.entregadoParentesco !== "Jefe de hogar" ? escapeHtml(` (${m.entregadoParentesco})`) : ""}</td>
+                      <td>${escapeHtml(formatRecibio(m, d))}</td>
                       <td>${escapeHtml(m.responsable || "—")}</td>
                     </tr>
                   `).join("")}
