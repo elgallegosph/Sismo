@@ -1,10 +1,55 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Solo usuarios autenticados (voluntarios/coordinadores creados en Firebase Authentication)
-    // pueden leer y escribir. Nadie más tiene acceso, ni siquiera de lectura.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    function rolDe(uid) {
+      return get(/databases/$(database)/documents/usuarios/$(uid)).data.rol;
+    }
+
+    function esAdmin() {
+      return estaAutenticado() && rolDe(request.auth.uid) == "admin";
+    }
+
+    function puedeInventario() {
+      return estaAutenticado() &&
+        (rolDe(request.auth.uid) == "admin" || rolDe(request.auth.uid) == "inventario");
+    }
+
+    // Cada usuario puede leer su propio rol (y el admin, leer/escribir cualquiera).
+    match /usuarios/{userId} {
+      allow read: if estaAutenticado();
+      allow write: if esAdmin();
+    }
+
+    // Damnificados: cualquiera autenticado puede ver; solo admin puede crear/editar/borrar.
+    match /damnificados/{docId} {
+      allow read: if estaAutenticado();
+      allow write: if esAdmin();
+    }
+
+    // Inventario: cualquiera autenticado puede ver; admin e inventario pueden modificar.
+    match /inventario/{docId} {
+      allow read: if estaAutenticado();
+      allow write: if puedeInventario();
+    }
+
+    // Movimientos (entradas/salidas): cualquiera autenticado puede ver;
+    // admin e inventario pueden crear; solo admin puede editar/borrar un movimiento existente.
+    match /movimientos/{docId} {
+      allow read: if estaAutenticado();
+      allow create: if puedeInventario();
+      allow update, delete: if esAdmin();
+    }
+
+    // Núcleo familiar (importado desde Excel, enlazado por RUD/número de formulario):
+    // cualquiera autenticado puede ver; solo admin puede importar/editar/borrar.
+    match /familiares/{docId} {
+      allow read: if estaAutenticado();
+      allow write: if esAdmin();
     }
   }
 }
