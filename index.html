@@ -314,11 +314,14 @@
     <div class="modal">
       <h3>Registrar entrega</h3>
       <form id="form-salida" class="modal-form">
-        <label>Damnificado
-          <input type="text" id="salida-buscar-damnificado" placeholder="Buscar por nombre o cédula…" autocomplete="off" />
+        <label>Persona que recibe
+          <input type="text" id="salida-buscar-damnificado" placeholder="Buscar por nombre o cédula (damnificado o cualquier integrante de su núcleo familiar)…" autocomplete="off" />
         </label>
         <div id="salida-damnificado-resultados" class="autocomplete-results"></div>
         <input type="hidden" id="salida-damnificado-id" required />
+        <input type="hidden" id="salida-entregado-nombre" />
+        <input type="hidden" id="salida-entregado-documento" />
+        <input type="hidden" id="salida-entregado-parentesco" />
         <p id="salida-damnificado-elegido" class="chosen-note" hidden></p>
 
         <label>Categoría
