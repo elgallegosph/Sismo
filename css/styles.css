@@ -167,6 +167,7 @@ button, input, select { font-family: inherit; font-size: inherit; }
 .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
 .badge-count { background: #E1EAE9; color: var(--color-primary-dark); }
 .badge-low { background: #F5DEDB; color: var(--color-danger); }
+.fila-coincidente td { background: #FBF0E0; font-weight: 600; }
 
 .inventory-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 .inventory-subtitle { font-size: 1rem; font-weight: 700; margin-bottom: 0.6rem; }
