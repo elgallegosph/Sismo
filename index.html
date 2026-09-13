@@ -46,6 +46,7 @@
         <button class="nav-item" data-panel="panel-inventario">Inventario</button>
         <button class="nav-item" data-panel="panel-movimientos">Entradas y salidas</button>
         <button class="nav-item" data-panel="panel-reportes">Entregas por persona</button>
+        <button class="nav-item" data-panel="panel-nucleo">Núcleo familiar</button>
       </nav>
       <div class="sidebar-bottom">
         <p class="session-user">Sesión: <span id="session-email">—</span></p>
@@ -173,6 +174,26 @@
         </div>
       </section>
 
+      <!-- ---------- NÚCLEO FAMILIAR ---------- -->
+      <section id="panel-nucleo" class="panel">
+        <header class="panel-header">
+          <div>
+            <h2>Núcleo familiar</h2>
+            <p class="panel-hint">Agrupado por número de formulario, enlazado al RUD del damnificado.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary" id="btn-importar-familiares">Importar núcleo familiar</button>
+          </div>
+          <input type="file" id="input-excel-familiares" accept=".xlsx,.xls,.csv" hidden />
+        </header>
+
+        <input type="search" id="buscar-nucleo" class="search-input" placeholder="Buscar por nombre, cédula, RUD o número de formulario…" />
+
+        <div id="nucleo-resultado" class="reporte-resultado">
+          <p class="empty-state">Escribe un nombre, cédula, RUD o número de formulario para ver el núcleo familiar.</p>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -205,7 +226,7 @@
           </select>
         </label>
 
-        <h4 class="modal-section">Núcleo familiar</h4>
+        <h4 class="modal-section">Composición familiar</h4>
         <label>Habitantes <input type="number" min="0" id="damnificado-habitantes" /></label>
         <label>Adultos <input type="number" min="0" id="damnificado-adultos" /></label>
         <label>Menores <input type="number" min="0" id="damnificado-menores" /></label>
@@ -228,6 +249,11 @@
           <label class="checkbox-label"><input type="checkbox" id="damnificado-via-afectada" /> Infraestructura vial afectada</label>
         </div>
         <label>Otra afectación de vivienda (describir) <input type="text" id="damnificado-vivienda-otro" /></label>
+
+        <h4 class="modal-section">Núcleo familiar (importado)</h4>
+        <div id="damnificado-nucleo-familiar">
+          <p class="empty-state">Se muestra al editar un damnificado ya guardado.</p>
+        </div>
 
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
