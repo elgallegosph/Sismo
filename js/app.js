@@ -464,31 +464,87 @@ formEntrada.addEventListener("submit", async (e) => {
 });
 
 // ============================================================
-// MOVIMIENTOS: SALIDA (entrega a un damnificado)
+// MOVIMIENTOS: SALIDA (entrega a un damnificado o a un integrante de su núcleo familiar)
 // ============================================================
 const buscarSalidaInput = document.getElementById("salida-buscar-damnificado");
 const resultadosSalida = document.getElementById("salida-damnificado-resultados");
-let damnificadoElegidoSalida = null;
+let resultadosSalidaActuales = [];
+
+// Busca coincidencias tanto en la lista de damnificados (jefes de hogar) como en el
+// núcleo familiar importado — pero un integrante del núcleo familiar solo puede recibir
+// si su formulario coincide con el RUD de un damnificado ya registrado.
+function buscarPersonasEntregables(filtro) {
+  const resultados = [];
+
+  damnificados.forEach((d) => {
+    if (coincideBusqueda(d, filtro)) {
+      resultados.push({
+        damnificadoId: d.id,
+        damnificadoNombre: d.nombre,
+        damnificadoCedula: d.cedula,
+        damnificadoRud: d.rud,
+        entregadoNombre: d.nombre,
+        entregadoDocumento: d.cedula,
+        entregadoParentesco: "Jefe de hogar",
+        etiqueta: `${d.nombre} — Jefe de hogar (RUD ${d.rud})`,
+      });
+    }
+  });
+
+  familiares.forEach((f) => {
+    if (f.formularioNum === null || f.formularioNum === undefined) return;
+    const damnificado = damnificados.find((d) => numeroRud(d.rud) === f.formularioNum);
+    if (!damnificado) return; // debe pertenecer al núcleo familiar de un RUD ya registrado
+    const coincide = (f.nombreCompleto || "").toLowerCase().includes(filtro) ||
+      (f.numeroDocumento || "").toLowerCase().includes(filtro);
+    if (coincide) {
+      resultados.push({
+        damnificadoId: damnificado.id,
+        damnificadoNombre: damnificado.nombre,
+        damnificadoCedula: damnificado.cedula,
+        damnificadoRud: damnificado.rud,
+        entregadoNombre: f.nombreCompleto,
+        entregadoDocumento: f.numeroDocumento,
+        entregadoParentesco: f.parentesco || "Familiar",
+        etiqueta: `${f.nombreCompleto} — ${f.parentesco || "Familiar"} (RUD ${damnificado.rud}, hogar de ${damnificado.nombre})`,
+      });
+    }
+  });
+
+  return resultados.slice(0, 8);
+}
+
+function limpiarSeleccionSalida() {
+  document.getElementById("salida-damnificado-id").value = "";
+  document.getElementById("salida-entregado-nombre").value = "";
+  document.getElementById("salida-entregado-documento").value = "";
+  document.getElementById("salida-entregado-parentesco").value = "";
+  document.getElementById("salida-damnificado-elegido").hidden = true;
+}
 
 buscarSalidaInput.addEventListener("input", () => {
   const filtro = buscarSalidaInput.value.trim().toLowerCase();
-  damnificadoElegidoSalida = null;
-  document.getElementById("salida-damnificado-id").value = "";
-  document.getElementById("salida-damnificado-elegido").hidden = true;
-  if (!filtro) { resultadosSalida.innerHTML = ""; return; }
-  const coincidencias = damnificados.filter((d) => coincideBusqueda(d, filtro)).slice(0, 6);
-  resultadosSalida.innerHTML = coincidencias.map((d) =>
-    `<div class="autocomplete-item" data-id="${d.id}">${escapeHtml(d.nombre)} — CC ${escapeHtml(d.cedula)}</div>`
+  limpiarSeleccionSalida();
+  if (!filtro) { resultadosSalida.innerHTML = ""; resultadosSalidaActuales = []; return; }
+
+  resultadosSalidaActuales = buscarPersonasEntregables(filtro);
+  resultadosSalida.innerHTML = resultadosSalidaActuales.map((r, idx) =>
+    `<div class="autocomplete-item" data-idx="${idx}">${escapeHtml(r.etiqueta)}</div>`
   ).join("");
+
   resultadosSalida.querySelectorAll(".autocomplete-item").forEach((el) => {
     el.addEventListener("click", () => {
-      const d = damnificados.find((x) => x.id === el.dataset.id);
-      damnificadoElegidoSalida = d;
-      document.getElementById("salida-damnificado-id").value = d.id;
-      buscarSalidaInput.value = d.nombre;
+      const r = resultadosSalidaActuales[Number(el.dataset.idx)];
+      document.getElementById("salida-damnificado-id").value = r.damnificadoId;
+      document.getElementById("salida-entregado-nombre").value = r.entregadoNombre;
+      document.getElementById("salida-entregado-documento").value = r.entregadoDocumento;
+      document.getElementById("salida-entregado-parentesco").value = r.entregadoParentesco;
+      buscarSalidaInput.value = r.entregadoNombre;
       resultadosSalida.innerHTML = "";
       const nota = document.getElementById("salida-damnificado-elegido");
-      nota.textContent = `Se entregará a: ${d.nombre} (CC ${d.cedula}, RUD ${d.rud})`;
+      nota.textContent = r.entregadoParentesco === "Jefe de hogar"
+        ? `Se entregará a: ${r.entregadoNombre} (Jefe de hogar, RUD ${r.damnificadoRud})`
+        : `Se entregará a: ${r.entregadoNombre} (${r.entregadoParentesco}) — núcleo familiar de ${r.damnificadoNombre}, RUD ${r.damnificadoRud}`;
       nota.hidden = false;
     });
   });
@@ -501,13 +557,16 @@ formSalida.addEventListener("submit", async (e) => {
   errorEl.hidden = true;
 
   const damnificadoId = document.getElementById("salida-damnificado-id").value;
+  const entregadoNombre = document.getElementById("salida-entregado-nombre").value;
+  const entregadoDocumento = document.getElementById("salida-entregado-documento").value;
+  const entregadoParentesco = document.getElementById("salida-entregado-parentesco").value;
   const itemId = document.getElementById("salida-item").value;
   const cantidad = Number(document.getElementById("salida-cantidad").value);
   const item = inventario.find((i) => i.id === itemId);
   const damnificado = damnificados.find((d) => d.id === damnificadoId);
 
-  if (!damnificado) {
-    errorEl.textContent = "Selecciona un damnificado de la lista de resultados.";
+  if (!damnificado || !entregadoNombre) {
+    errorEl.textContent = "Selecciona una persona de la lista de resultados.";
     errorEl.hidden = false;
     return;
   }
@@ -535,6 +594,9 @@ formSalida.addEventListener("submit", async (e) => {
         damnificadoId,
         damnificadoNombre: damnificado.nombre,
         damnificadoCedula: damnificado.cedula,
+        entregadoNombre,
+        entregadoDocumento,
+        entregadoParentesco,
         fecha: serverTimestamp(),
         responsable: auth.currentUser.email,
       });
@@ -542,7 +604,7 @@ formSalida.addEventListener("submit", async (e) => {
     mostrarToast("Entrega registrada y stock actualizado.");
     formSalida.reset();
     resultadosSalida.innerHTML = "";
-    document.getElementById("salida-damnificado-elegido").hidden = true;
+    limpiarSeleccionSalida();
     cerrarModal("modal-salida");
   } catch (err) {
     errorEl.textContent = err.message === "STOCK_INSUFICIENTE"
@@ -555,6 +617,13 @@ formSalida.addEventListener("submit", async (e) => {
 // ============================================================
 // TABLA DE MOVIMIENTOS
 // ============================================================
+function formatEntregadoA(m) {
+  if (!m.entregadoNombre || m.entregadoNombre === m.damnificadoNombre) {
+    return `${m.damnificadoNombre} (CC ${m.damnificadoCedula})`;
+  }
+  return `${m.entregadoNombre} (${m.entregadoParentesco || "Familiar"}) — hogar de ${m.damnificadoNombre}`;
+}
+
 function renderMovimientos() {
   const tbody = document.getElementById("tabla-movimientos");
   if (movimientos.length === 0) {
@@ -568,7 +637,7 @@ function renderMovimientos() {
       <td>${m.categoria === "mercado" ? "Mercado" : "Material"}</td>
       <td>${escapeHtml(m.itemNombre)}</td>
       <td>${m.cantidad}</td>
-      <td>${m.tipo === "salida" ? escapeHtml(`${m.damnificadoNombre} (CC ${m.damnificadoCedula})`) : "—"}</td>
+      <td>${m.tipo === "salida" ? escapeHtml(formatEntregadoA(m)) : "—"}</td>
       <td>${escapeHtml(m.responsable || "—")}</td>
     </tr>
   `).join("");
@@ -606,16 +675,17 @@ function renderReporteSiHayBusqueda() {
         </div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>Fecha</th><th>Categoría</th><th>Artículo</th><th>Cantidad</th><th>Responsable</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Categoría</th><th>Artículo</th><th>Cantidad</th><th>Recibió</th><th>Responsable</th></tr></thead>
             <tbody>
               ${historial.length === 0
-                ? `<tr class="empty-row"><td colspan="5">Todavía no ha recibido entregas.</td></tr>`
+                ? `<tr class="empty-row"><td colspan="6">Todavía no ha recibido entregas.</td></tr>`
                 : historial.map((m) => `
                     <tr>
                       <td>${formatearFecha(m.fecha)}</td>
                       <td>${m.categoria === "mercado" ? "Mercado" : "Material"}</td>
                       <td>${escapeHtml(m.itemNombre)}</td>
                       <td>${m.cantidad}</td>
+                      <td>${escapeHtml(m.entregadoNombre || d.nombre)}${m.entregadoParentesco && m.entregadoParentesco !== "Jefe de hogar" ? escapeHtml(` (${m.entregadoParentesco})`) : ""}</td>
                       <td>${escapeHtml(m.responsable || "—")}</td>
                     </tr>
                   `).join("")}
@@ -694,13 +764,17 @@ function renderNucleoPanel() {
           <table class="data-table">
             <thead><tr><th>Parentesco</th><th>Nombre completo</th><th>Documento</th></tr></thead>
             <tbody>
-              ${miembros.map((f) => `
-                <tr>
+              ${miembros.map((f) => {
+                const coincideMiembro = (f.nombreCompleto || "").toLowerCase().includes(filtro) ||
+                  (f.numeroDocumento || "").toLowerCase().includes(filtro);
+                return `
+                <tr class="${coincideMiembro ? "fila-coincidente" : ""}">
                   <td>${escapeHtml(f.parentesco || "—")}</td>
                   <td>${escapeHtml(f.nombreCompleto)}</td>
                   <td>${escapeHtml(f.tipoDocumento || "")} ${escapeHtml(f.numeroDocumento || "")}</td>
                 </tr>
-              `).join("")}
+              `;
+              }).join("")}
             </tbody>
           </table>
         </div>
