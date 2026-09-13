@@ -4,7 +4,6 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs,
   onSnapshot, runTransaction, serverTimestamp, query, orderBy, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -850,7 +849,7 @@ inputExcelFamiliares.addEventListener("change", async (e) => {
       return;
     }
 
-        if (!confirm(`Se van a importar ${registros.length} integrantes de núcleo familiar${omitidos ? ` (se omiten ${omitidos} filas sin formulario o nombre)` : ""}.\n\nEsto REEMPLAZARÁ por completo el núcleo familiar que tengas guardado actualmente (se borra todo lo anterior antes de subir lo nuevo). ¿Continuar?`)) {
+    if (!confirm(`Se van a importar ${registros.length} integrantes de núcleo familiar${omitidos ? ` (se omiten ${omitidos} filas sin formulario o nombre)` : ""}.\n\nEsto REEMPLAZARÁ por completo el núcleo familiar que tengas guardado actualmente (se borra todo lo anterior antes de subir lo nuevo). ¿Continuar?`)) {
       inputExcelFamiliares.value = "";
       return;
     }
@@ -868,6 +867,12 @@ inputExcelFamiliares.addEventListener("change", async (e) => {
     }
 
     for (let i = 0; i < registros.length; i += LOTE) {
+      const batch = writeBatch(db);
+      registros.slice(i, i + LOTE).forEach((r) => {
+        const ref = doc(collection(db, "familiares"));
+        batch.set(ref, { ...r, fechaImportacion: serverTimestamp(), registradoPor: auth.currentUser.email });
+      });
+      await batch.commit();
     }
 
     mostrarToast(`${registros.length} integrantes de núcleo familiar importados correctamente.`);
