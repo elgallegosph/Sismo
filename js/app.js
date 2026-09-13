@@ -255,12 +255,32 @@ function renderDamnificados() {
       <td>${escapeHtml(d.telefono || "—")}</td>
       <td><span class="badge badge-count">${contarEntregas(d.id, "mercado")}</span></td>
       <td><span class="badge badge-count">${contarEntregas(d.id, "material")}</span></td>
-      <td>${rolActual === "admin" ? `<button class="btn btn-ghost btn-small" data-editar-damnificado="${d.id}">Editar</button>` : ""}</td>
+      <td>
+        ${rolActual === "admin" ? `
+          <button class="btn btn-ghost btn-small" data-editar-damnificado="${d.id}">Editar</button>
+          <button class="btn btn-ghost btn-small" data-eliminar-damnificado="${d.id}">Eliminar</button>
+        ` : ""}
+      </td>
     </tr>
   `).join("");
 
   tbody.querySelectorAll("[data-editar-damnificado]").forEach((btn) => {
     btn.addEventListener("click", () => abrirEdicionDamnificado(btn.dataset.editarDamnificado));
+  });
+
+  tbody.querySelectorAll("[data-eliminar-damnificado]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const d = damnificados.find((x) => x.id === btn.dataset.eliminarDamnificado);
+      if (!d) return;
+      if (confirm(`¿Eliminar a ${d.nombre} (CC ${d.cedula}, RUD ${d.rud})? Esta acción no se puede deshacer. El historial de entregas que ya se le registraron se conserva, pero quedará sin damnificado asociado.`)) {
+        try {
+          await deleteDoc(doc(db, "damnificados", d.id));
+          mostrarToast("Damnificado eliminado.");
+        } catch (err) {
+          mostrarToast("No se pudo eliminar. Intenta de nuevo.", true);
+        }
+      }
+    });
   });
 }
 
