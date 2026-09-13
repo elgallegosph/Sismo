@@ -4,7 +4,8 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc,
+  import {
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs,
   onSnapshot, runTransaction, serverTimestamp, query, orderBy, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -849,19 +850,24 @@ inputExcelFamiliares.addEventListener("change", async (e) => {
       return;
     }
 
-    if (!confirm(`Se van a importar ${registros.length} integrantes de núcleo familiar${omitidos ? ` (se omiten ${omitidos} filas sin formulario o nombre)` : ""}. ¿Continuar?`)) {
+        if (!confirm(`Se van a importar ${registros.length} integrantes de núcleo familiar${omitidos ? ` (se omiten ${omitidos} filas sin formulario o nombre)` : ""}.\n\nEsto REEMPLAZARÁ por completo el núcleo familiar que tengas guardado actualmente (se borra todo lo anterior antes de subir lo nuevo). ¿Continuar?`)) {
       inputExcelFamiliares.value = "";
       return;
     }
 
     const LOTE = 400;
+
+    // Borra todo el núcleo familiar existente antes de subir el nuevo, para que
+    // volver a importar el mismo Excel (o una versión corregida) nunca duplique datos.
+    const existentesSnap = await getDocs(collection(db, "familiares"));
+    const idsExistentes = existentesSnap.docs.map((d) => d.id);
+    for (let i = 0; i < idsExistentes.length; i += LOTE) {
+      const batchBorrado = writeBatch(db);
+      idsExistentes.slice(i, i + LOTE).forEach((id) => batchBorrado.delete(doc(db, "familiares", id)));
+      await batchBorrado.commit();
+    }
+
     for (let i = 0; i < registros.length; i += LOTE) {
-      const batch = writeBatch(db);
-      registros.slice(i, i + LOTE).forEach((r) => {
-        const ref = doc(collection(db, "familiares"));
-        batch.set(ref, { ...r, fechaImportacion: serverTimestamp(), registradoPor: auth.currentUser.email });
-      });
-      await batch.commit();
     }
 
     mostrarToast(`${registros.length} integrantes de núcleo familiar importados correctamente.`);
