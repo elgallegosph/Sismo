@@ -917,10 +917,18 @@ const CAMPOS_TEXTO = ["nombre", "cedula", "telefono", "vereda", "direccion", "ru
 const CAMPOS_NUMERO = ["habitantes", "adultos", "menores"];
 const CAMPOS_SINO = ["viviendaAveriadaTecho", "viviendaAveriadaPared", "viviendaAveriadaPisos", "formatoDesalojoFirmado", "desalojados", "viviendaAfectadaEstructural", "viviendaColapsada", "edificacionAveriada", "edificacionAfectadaEstructural", "edificacionColapsada", "infraestructuraVialAfectada"];
 
+function normalizarTexto(s) {
+  return String(s ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quita acentos, sin importar cómo estén codificados
+    .trim()
+    .toLowerCase();
+}
+
 function buscarColumna(fila, opciones) {
   const claves = Object.keys(fila);
-  for (const opcion of opciones) {
-    const encontrada = claves.find((k) => k.trim().toLowerCase() === opcion);
+  const opcionesNormalizadas = opciones.map(normalizarTexto);
+  for (let i = 0; i < opcionesNormalizadas.length; i++) {
+    const encontrada = claves.find((k) => normalizarTexto(k) === opcionesNormalizadas[i]);
     if (encontrada) return fila[encontrada];
   }
   return "";
