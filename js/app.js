@@ -16,6 +16,7 @@ const db = getFirestore(app);
 let damnificados = [];
 let inventario = [];
 let movimientos = [];
+let familiares = [];
 
 // ============================================================
 // AUTENTICACIÓN
@@ -80,6 +81,7 @@ function aplicarPermisos() {
 
   document.getElementById("btn-importar-excel").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-registrar-damnificado").hidden = !puedeEditarDamnificados;
+  document.getElementById("btn-importar-familiares").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-agregar-item").hidden = !puedeInventario;
   document.getElementById("btn-registrar-entrada").hidden = !puedeInventario;
   document.getElementById("btn-registrar-salida").hidden = !puedeInventario;
@@ -158,6 +160,11 @@ function iniciarListeners() {
     renderMovimientos();
     renderDamnificados();
     renderReporteSiHayBusqueda();
+  });
+
+  onSnapshot(collection(db, "familiares"), (snap) => {
+    familiares = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderNucleoPanel();
   });
 }
 
@@ -289,7 +296,46 @@ function abrirEdicionDamnificado(id) {
   document.getElementById("damnificado-edif-estructural").checked = !!d.edificacionAfectadaEstructural;
   document.getElementById("damnificado-edif-colapsada").checked = !!d.edificacionColapsada;
   document.getElementById("damnificado-via-afectada").checked = !!d.infraestructuraVialAfectada;
+  renderNucleoFamiliarEnModal(d);
   document.getElementById("modal-damnificado").hidden = false;
+}
+
+document.getElementById("btn-registrar-damnificado").addEventListener("click", () => {
+  formDamnificado.reset();
+  document.getElementById("damnificado-id").value = "";
+  document.getElementById("damnificado-nucleo-familiar").innerHTML =
+    `<p class="empty-state">Se muestra al editar un damnificado ya guardado, si hay datos de núcleo familiar importados para su RUD.</p>`;
+});
+
+function numeroRud(valor) {
+  const digitos = String(valor ?? "").replace(/\D/g, "");
+  return digitos ? parseInt(digitos, 10) : null;
+}
+
+function renderNucleoFamiliarEnModal(d) {
+  const cont = document.getElementById("damnificado-nucleo-familiar");
+  const num = numeroRud(d.rud);
+  const miembros = num === null ? [] : familiares.filter((f) => f.formularioNum === num);
+  if (miembros.length === 0) {
+    cont.innerHTML = `<p class="empty-state">No hay núcleo familiar importado para este RUD.</p>`;
+    return;
+  }
+  cont.innerHTML = `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Parentesco</th><th>Nombre completo</th><th>Documento</th></tr></thead>
+        <tbody>
+          ${miembros.map((f) => `
+            <tr>
+              <td>${escapeHtml(f.parentesco || "—")}</td>
+              <td>${escapeHtml(f.nombreCompleto)}</td>
+              <td>${escapeHtml(f.tipoDocumento || "")} ${escapeHtml(f.numeroDocumento || "")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 document.getElementById("buscar-damnificado").addEventListener("input", renderDamnificados);
@@ -596,6 +642,154 @@ function escapeHtml(str) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
 }
+
+// ============================================================
+// NÚCLEO FAMILIAR (panel de consulta agrupado por formulario/RUD)
+// ============================================================
+const buscarNucleoInput = document.getElementById("buscar-nucleo");
+buscarNucleoInput.addEventListener("input", renderNucleoPanel);
+
+function renderNucleoPanel() {
+  const contenedor = document.getElementById("nucleo-resultado");
+  if (!contenedor) return; // el panel puede no existir todavía en el DOM en el primer render
+  const filtro = buscarNucleoInput.value.trim().toLowerCase();
+  if (!filtro) {
+    contenedor.innerHTML = `<p class="empty-state">Escribe un nombre, cédula, RUD o número de formulario para ver el núcleo familiar.</p>`;
+    return;
+  }
+
+  const grupos = new Map();
+  familiares.forEach((f) => {
+    if (f.formularioNum === null || f.formularioNum === undefined) return;
+    if (!grupos.has(f.formularioNum)) grupos.set(f.formularioNum, []);
+    grupos.get(f.formularioNum).push(f);
+  });
+
+  const soloDigitos = filtro.replace(/\D/g, "");
+
+  const resultados = [...grupos.entries()].filter(([num, miembros]) => {
+    const damnificado = damnificados.find((d) => numeroRud(d.rud) === num);
+    if (damnificado && coincideBusqueda(damnificado, filtro)) return true;
+    if (soloDigitos && String(num).includes(soloDigitos)) return true;
+    return miembros.some((f) =>
+      (f.nombreCompleto || "").toLowerCase().includes(filtro) ||
+      (f.numeroDocumento || "").toLowerCase().includes(filtro)
+    );
+  });
+
+  if (resultados.length === 0) {
+    contenedor.innerHTML = `<p class="empty-state">No se encontraron coincidencias.</p>`;
+    return;
+  }
+
+  contenedor.innerHTML = resultados.map(([num, miembros]) => {
+    const damnificado = damnificados.find((d) => numeroRud(d.rud) === num);
+    return `
+      <div class="reporte-persona">
+        <h3>${damnificado ? escapeHtml(damnificado.nombre) : `Formulario ${num}`}</h3>
+        <p>${damnificado
+          ? `CC ${escapeHtml(damnificado.cedula)} · RUD ${escapeHtml(damnificado.rud)}`
+          : "Sin damnificado principal asociado en la lista de damnificados"}</p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Parentesco</th><th>Nombre completo</th><th>Documento</th></tr></thead>
+            <tbody>
+              ${miembros.map((f) => `
+                <tr>
+                  <td>${escapeHtml(f.parentesco || "—")}</td>
+                  <td>${escapeHtml(f.nombreCompleto)}</td>
+                  <td>${escapeHtml(f.tipoDocumento || "")} ${escapeHtml(f.numeroDocumento || "")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }).join("<hr style='margin:1.5rem 0;border:none;border-top:1px solid var(--color-border)'>");
+}
+
+// ============================================================
+// IMPORTAR NÚCLEO FAMILIAR DESDE EXCEL
+// ============================================================
+const btnImportarFamiliares = document.getElementById("btn-importar-familiares");
+const inputExcelFamiliares = document.getElementById("input-excel-familiares");
+
+btnImportarFamiliares.addEventListener("click", () => inputExcelFamiliares.click());
+
+const MAPA_COLUMNAS_FAMILIA = {
+  formulario: ["numero formulario", "número formulario", "formulario", "no. formulario"],
+  primerNombre: ["primer nombre"],
+  segundoNombre: ["segundo nombre"],
+  primerApellido: ["primer apellido"],
+  segundoApellido: ["segundo apellido"],
+  parentesco: ["parentesco"],
+  tipoDocumento: ["tipo documento"],
+  numeroDocumento: ["numero documento", "número documento"],
+};
+
+inputExcelFamiliares.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const libro = XLSX.read(buffer, { type: "array" });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+
+    if (filas.length === 0) {
+      mostrarToast("El archivo no tiene filas de datos.", true);
+      return;
+    }
+
+    const registros = filas.map((fila) => {
+      const formulario = String(buscarColumna(fila, MAPA_COLUMNAS_FAMILIA.formulario)).trim();
+      const primerNombre = String(buscarColumna(fila, MAPA_COLUMNAS_FAMILIA.primerNombre)).trim();
+      const segundoNombre = String(buscarColumna(fila, MAPA_COLUMNAS_FAMILIA.segundoNombre)).trim();
+      const primerApellido = String(buscarColumna(fila, MAPA_COLUMNAS_FAMILIA.primerApellido)).trim();
+      const segundoApellido = String(buscarColumna(fila, MAPA_COLUMNAS_FAMILIA.segundoApellido)).trim();
+      return {
+        formulario,
+        formularioNum: numeroRud(formulario),
+        primerNombre, segundoNombre, primerApellido, segundoApellido,
+        nombreCompleto: [primerNombre, segundoNombre, primerApellido, segundoApellido].filter(Boolean).join(" "),
+        parentesco: String(buscarColumna(fila, MAPA_COLUMNAS_FAMILIA.parentesco)).trim(),
+        tipoDocumento: String(buscarColumna(fila, MAPA_COLUMNAS_FAMILIA.tipoDocumento)).trim(),
+        numeroDocumento: String(buscarColumna(fila, MAPA_COLUMNAS_FAMILIA.numeroDocumento)).trim(),
+      };
+    }).filter((r) => r.formularioNum !== null && r.nombreCompleto);
+
+    const omitidos = filas.length - registros.length;
+
+    if (registros.length === 0) {
+      mostrarToast("Ninguna fila tiene número de formulario y nombre válidos.", true);
+      return;
+    }
+
+    if (!confirm(`Se van a importar ${registros.length} integrantes de núcleo familiar${omitidos ? ` (se omiten ${omitidos} filas sin formulario o nombre)` : ""}. ¿Continuar?`)) {
+      inputExcelFamiliares.value = "";
+      return;
+    }
+
+    const LOTE = 400;
+    for (let i = 0; i < registros.length; i += LOTE) {
+      const batch = writeBatch(db);
+      registros.slice(i, i + LOTE).forEach((r) => {
+        const ref = doc(collection(db, "familiares"));
+        batch.set(ref, { ...r, fechaImportacion: serverTimestamp(), registradoPor: auth.currentUser.email });
+      });
+      await batch.commit();
+    }
+
+    mostrarToast(`${registros.length} integrantes de núcleo familiar importados correctamente.`);
+  } catch (err) {
+    console.error(err);
+    mostrarToast("No se pudo leer el archivo. Verifica que sea un Excel o CSV válido.", true);
+  } finally {
+    inputExcelFamiliares.value = "";
+  }
+});
 
 // ============================================================
 // IMPORTAR DAMNIFICADOS DESDE EXCEL
