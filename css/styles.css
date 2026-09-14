@@ -186,6 +186,35 @@ button, input, select { font-family: inherit; font-size: inherit; }
 .count-card .n { font-size: 1.8rem; font-weight: 800; color: var(--color-primary); }
 .count-card .label { color: var(--color-text-muted); font-size: 0.85rem; }
 
+/* ---------- Dashboard ---------- */
+.dashboard-section-title { font-size: 1rem; font-weight: 800; margin: 1.75rem 0 0.5rem; }
+.dashboard-section-title:first-of-type { margin-top: 0; }
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+.dashboard-grid .count-card { background: var(--color-surface); }
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.chart-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+.chart-title { font-size: 0.82rem; font-weight: 600; color: var(--color-text-muted); margin: 0 0 0.5rem; }
+.chart-card canvas { flex: 1; min-height: 0; }
+.diff-ok { color: var(--color-primary-dark); font-weight: 600; }
+.diff-warn { color: var(--color-danger); font-weight: 700; }
+
 /* ---------- Modales ---------- */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(20, 30, 29, 0.55);
