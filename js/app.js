@@ -17,6 +17,7 @@ let damnificados = [];
 let inventario = [];
 let movimientos = [];
 let familiares = [];
+let damnificadoEnEdicion = null; // referencia al damnificado que está abierto en el modal, para refrescar su núcleo familiar en vivo
 
 // ============================================================
 // AUTENTICACIÓN
@@ -115,17 +116,23 @@ document.querySelectorAll("[data-open-modal]").forEach((btn) => {
 });
 document.querySelectorAll("[data-close-modal]").forEach((btn) => {
   btn.addEventListener("click", () => {
-    btn.closest(".modal-overlay").hidden = true;
+    const overlay = btn.closest(".modal-overlay");
+    overlay.hidden = true;
+    if (overlay.id === "modal-damnificado") damnificadoEnEdicion = null;
   });
 });
 document.querySelectorAll(".modal-overlay").forEach((overlay) => {
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.hidden = true;
+    if (e.target === overlay) {
+      overlay.hidden = true;
+      if (overlay.id === "modal-damnificado") damnificadoEnEdicion = null;
+    }
   });
 });
 
 function cerrarModal(id) {
   document.getElementById(id).hidden = true;
+  if (id === "modal-damnificado") damnificadoEnEdicion = null;
 }
 
 function mostrarToast(mensaje, esError = false) {
@@ -165,6 +172,10 @@ function iniciarListeners() {
   onSnapshot(collection(db, "familiares"), (snap) => {
     familiares = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderNucleoPanel();
+    if (damnificadoEnEdicion) {
+      const actualizado = damnificados.find((x) => x.id === damnificadoEnEdicion.id) || damnificadoEnEdicion;
+      renderNucleoFamiliarEnModal(actualizado);
+    }
   });
 }
 
@@ -316,6 +327,7 @@ function abrirEdicionDamnificado(id) {
   document.getElementById("damnificado-edif-estructural").checked = !!d.edificacionAfectadaEstructural;
   document.getElementById("damnificado-edif-colapsada").checked = !!d.edificacionColapsada;
   document.getElementById("damnificado-via-afectada").checked = !!d.infraestructuraVialAfectada;
+  damnificadoEnEdicion = d;
   renderNucleoFamiliarEnModal(d);
   document.getElementById("modal-damnificado").hidden = false;
 }
@@ -323,8 +335,9 @@ function abrirEdicionDamnificado(id) {
 document.getElementById("btn-registrar-damnificado").addEventListener("click", () => {
   formDamnificado.reset();
   document.getElementById("damnificado-id").value = "";
+  damnificadoEnEdicion = null;
   document.getElementById("damnificado-nucleo-familiar").innerHTML =
-    `<p class="empty-state">Se muestra al editar un damnificado ya guardado, si hay datos de núcleo familiar importados para su RUD.</p>`;
+    `<p class="empty-state">Guarda primero el damnificado; una vez guardado, edítalo de nuevo para agregarle integrantes del núcleo familiar.</p>`;
 });
 
 function numeroRud(valor) {
@@ -336,26 +349,99 @@ function renderNucleoFamiliarEnModal(d) {
   const cont = document.getElementById("damnificado-nucleo-familiar");
   const num = numeroRud(d.rud);
   const miembros = num === null ? [] : familiares.filter((f) => f.formularioNum === num);
-  if (miembros.length === 0) {
-    cont.innerHTML = `<p class="empty-state">No hay núcleo familiar importado para este RUD.</p>`;
-    return;
-  }
-  cont.innerHTML = `
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Parentesco</th><th>Nombre completo</th><th>Documento</th></tr></thead>
-        <tbody>
-          ${miembros.map((f) => `
-            <tr>
-              <td>${escapeHtml(f.parentesco || "—")}</td>
-              <td>${escapeHtml(f.nombreCompleto)}</td>
-              <td>${escapeHtml(f.tipoDocumento || "")} ${escapeHtml(f.numeroDocumento || "")}</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
+
+  const tablaHtml = miembros.length === 0
+    ? `<p class="empty-state">No hay integrantes registrados para este RUD todavía.</p>`
+    : `
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Parentesco</th><th>Nombre completo</th><th>Documento</th><th></th></tr></thead>
+          <tbody>
+            ${miembros.map((f) => `
+              <tr>
+                <td>${escapeHtml(f.parentesco || "—")}</td>
+                <td>${escapeHtml(f.nombreCompleto)}</td>
+                <td>${escapeHtml(f.tipoDocumento || "")} ${escapeHtml(f.numeroDocumento || "")}</td>
+                <td>${rolActual === "admin" ? `<button type="button" class="btn btn-ghost btn-small" data-eliminar-familiar="${f.id}">Eliminar</button>` : ""}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+  const formHtml = rolActual === "admin" ? `
+    <div class="agregar-familiar">
+      <label>Nombre completo <input type="text" id="familiar-nombre" /></label>
+      <label>Parentesco <input type="text" id="familiar-parentesco" placeholder="Hijo(a), cónyuge…" /></label>
+      <label>Tipo de documento
+        <select id="familiar-tipo-doc">
+          <option value="CC">CC</option>
+          <option value="TI">TI</option>
+          <option value="RC">RC</option>
+          <option value="CE">CE</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </label>
+      <label>Número de documento <input type="text" id="familiar-num-doc" /></label>
+      <button type="button" class="btn btn-secondary btn-small" id="btn-agregar-familiar">Agregar integrante</button>
+      <p class="form-error" id="familiar-error" hidden></p>
     </div>
-  `;
+  ` : "";
+
+  cont.innerHTML = tablaHtml + formHtml;
+
+  cont.querySelectorAll("[data-eliminar-familiar]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (confirm("¿Eliminar este integrante del núcleo familiar?")) {
+        try {
+          await deleteDoc(doc(db, "familiares", btn.dataset.eliminarFamiliar));
+        } catch (err) {
+          mostrarToast("No se pudo eliminar el integrante.", true);
+        }
+      }
+    });
+  });
+
+  const btnAgregarFamiliar = document.getElementById("btn-agregar-familiar");
+  if (btnAgregarFamiliar) {
+    btnAgregarFamiliar.addEventListener("click", async () => {
+      const errorEl = document.getElementById("familiar-error");
+      errorEl.hidden = true;
+      const nombreCompleto = document.getElementById("familiar-nombre").value.trim();
+      const parentesco = document.getElementById("familiar-parentesco").value.trim();
+      const tipoDocumento = document.getElementById("familiar-tipo-doc").value;
+      const numeroDocumento = document.getElementById("familiar-num-doc").value.trim();
+
+      if (!nombreCompleto) {
+        errorEl.textContent = "Escribe el nombre completo del integrante.";
+        errorEl.hidden = false;
+        return;
+      }
+      const numRud = numeroRud(d.rud);
+      if (numRud === null) {
+        errorEl.textContent = "Este damnificado no tiene un RUD válido; no se puede asociar el integrante.";
+        errorEl.hidden = false;
+        return;
+      }
+      try {
+        await addDoc(collection(db, "familiares"), {
+          formulario: String(numRud),
+          formularioNum: numRud,
+          nombreCompleto,
+          parentesco,
+          tipoDocumento,
+          numeroDocumento,
+          fechaImportacion: serverTimestamp(),
+          registradoPor: auth.currentUser.email,
+        });
+        mostrarToast("Integrante agregado al núcleo familiar.");
+      } catch (err) {
+        errorEl.textContent = "No se pudo agregar. Intenta de nuevo.";
+        errorEl.hidden = false;
+      }
+    });
+  }
 }
 
 document.getElementById("buscar-damnificado").addEventListener("input", renderDamnificados);
