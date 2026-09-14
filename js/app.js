@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs,
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, setDoc,
   onSnapshot, runTransaction, serverTimestamp, query, orderBy, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -17,6 +17,7 @@ let damnificados = [];
 let inventario = [];
 let movimientos = [];
 let familiares = [];
+let resumen = null;
 let damnificadoEnEdicion = null; // referencia al damnificado que está abierto en el modal, para refrescar su núcleo familiar en vivo
 
 // ============================================================
@@ -83,6 +84,7 @@ function aplicarPermisos() {
   document.getElementById("btn-importar-excel").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-registrar-damnificado").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-importar-familiares").hidden = !puedeEditarDamnificados;
+  document.getElementById("btn-importar-resumen").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-agregar-item").hidden = !puedeInventario;
   document.getElementById("btn-registrar-entrada").hidden = !puedeInventario;
   document.getElementById("btn-registrar-salida").hidden = !puedeInventario;
@@ -155,11 +157,13 @@ function iniciarListeners() {
     damnificados = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderDamnificados();
     renderReporteSiHayBusqueda();
+    renderDashboard();
   });
 
   onSnapshot(collection(db, "inventario"), (snap) => {
     inventario = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderInventario();
+    renderDashboard();
   });
 
   onSnapshot(query(collection(db, "movimientos"), orderBy("fecha", "desc")), (snap) => {
@@ -167,6 +171,7 @@ function iniciarListeners() {
     renderMovimientos();
     renderDamnificados();
     renderReporteSiHayBusqueda();
+    renderDashboard();
   });
 
   onSnapshot(collection(db, "familiares"), (snap) => {
@@ -176,6 +181,12 @@ function iniciarListeners() {
       const actualizado = damnificados.find((x) => x.id === damnificadoEnEdicion.id) || damnificadoEnEdicion;
       renderNucleoFamiliarEnModal(actualizado);
     }
+    renderDashboard();
+  });
+
+  onSnapshot(doc(db, "resumen", "general"), (snap) => {
+    resumen = snap.exists() ? snap.data() : null;
+    renderDashboard();
   });
 }
 
@@ -991,6 +1002,183 @@ inputExcelFamiliares.addEventListener("change", async (e) => {
 });
 
 // ============================================================
+// DASHBOARD
+// ============================================================
+let chartViviendas = null;
+let chartEntregas = null;
+let chartInventario = null;
+
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function renderDashboard() {
+  const cont = document.getElementById("resumen-familias");
+  if (!cont) return; // el panel puede no existir todavía en el DOM en el primer render
+
+  // ---------- Tarjetas del resumen importado ----------
+  document.getElementById("resumen-familias").textContent = resumen ? num(resumen.familias).toLocaleString("es-CO") : "—";
+  document.getElementById("resumen-personas").textContent = resumen ? num(resumen.personas).toLocaleString("es-CO") : "—";
+  document.getElementById("resumen-habitables").textContent = resumen ? num(resumen.viviendasHabitables).toLocaleString("es-CO") : "—";
+  document.getElementById("resumen-no-habitables").textContent = resumen ? num(resumen.viviendasNoHabitables).toLocaleString("es-CO") : "—";
+  document.getElementById("resumen-destruidas").textContent = resumen ? num(resumen.viviendasDestruidas).toLocaleString("es-CO") : "—";
+  document.getElementById("resumen-averiadas").textContent = resumen ? num(resumen.viviendasAveriadas).toLocaleString("es-CO") : "—";
+
+  const metaEl = document.getElementById("resumen-meta");
+  metaEl.textContent = resumen && resumen.actualizadoEn
+    ? `Última actualización: ${formatearFecha(resumen.actualizadoEn)} · por ${resumen.actualizadoPor || "—"}`
+    : "Todavía no se ha importado un resumen general.";
+
+  // ---------- Cálculos a partir del registro ----------
+  const totalDamnificados = damnificados.length;
+  const totalHabitantes = damnificados.reduce((acc, d) => acc + num(d.habitantes), 0);
+  const totalColapsadas = damnificados.filter((d) => d.viviendaColapsada).length;
+  const totalAveriadas = damnificados.filter((d) => d.viviendaAveriadaTecho || d.viviendaAveriadaPared || d.viviendaAveriadaPisos).length;
+  const totalFamiliares = familiares.length;
+  const entregasMercado = movimientos.filter((m) => m.tipo === "salida" && m.categoria === "mercado").length;
+  const entregasMaterial = movimientos.filter((m) => m.tipo === "salida" && m.categoria === "material").length;
+  const agotados = inventario.filter((i) => (i.stock || 0) <= 0).length;
+
+  document.getElementById("op-damnificados").textContent = totalDamnificados.toLocaleString("es-CO");
+  document.getElementById("op-habitantes").textContent = totalHabitantes.toLocaleString("es-CO");
+  document.getElementById("op-familiares").textContent = totalFamiliares.toLocaleString("es-CO");
+  document.getElementById("op-entregas-mercado").textContent = entregasMercado.toLocaleString("es-CO");
+  document.getElementById("op-entregas-material").textContent = entregasMaterial.toLocaleString("es-CO");
+  document.getElementById("op-agotados").textContent = agotados.toLocaleString("es-CO");
+
+  // ---------- Tabla de concordancia ----------
+  const filasConcordancia = [
+    { etiqueta: "Familias", importado: resumen ? num(resumen.familias) : null, calculado: totalDamnificados },
+    { etiqueta: "Personas", importado: resumen ? num(resumen.personas) : null, calculado: totalHabitantes },
+    { etiqueta: "Viviendas destruidas", importado: resumen ? num(resumen.viviendasDestruidas) : null, calculado: totalColapsadas },
+    { etiqueta: "Viviendas averiadas", importado: resumen ? num(resumen.viviendasAveriadas) : null, calculado: totalAveriadas },
+  ];
+  document.getElementById("tabla-concordancia").innerHTML = filasConcordancia.map((f) => {
+    if (f.importado === null) {
+      return `<tr><td>${escapeHtml(f.etiqueta)}</td><td>—</td><td>${f.calculado.toLocaleString("es-CO")}</td><td>—</td></tr>`;
+    }
+    const diferencia = f.importado - f.calculado;
+    const claseDif = diferencia === 0 ? "diff-ok" : "diff-warn";
+    const textoDif = diferencia === 0 ? "Coincide" : (diferencia > 0 ? `+${diferencia}` : String(diferencia));
+    return `
+      <tr>
+        <td>${escapeHtml(f.etiqueta)}</td>
+        <td>${f.importado.toLocaleString("es-CO")}</td>
+        <td>${f.calculado.toLocaleString("es-CO")}</td>
+        <td class="${claseDif}">${textoDif}</td>
+      </tr>
+    `;
+  }).join("");
+
+  // ---------- Gráficos ----------
+  if (typeof Chart === "undefined") return; // por si el CDN todavía no cargó
+
+  const dataViviendas = resumen
+    ? [num(resumen.viviendasHabitables), num(resumen.viviendasNoHabitables), num(resumen.viviendasDestruidas), num(resumen.viviendasAveriadas)]
+    : [0, 0, 0, 0];
+  if (chartViviendas) chartViviendas.destroy();
+  chartViviendas = new Chart(document.getElementById("chart-viviendas"), {
+    type: "bar",
+    data: {
+      labels: ["Habitables", "No habitables", "Destruidas", "Averiadas"],
+      datasets: [{ data: dataViviendas, backgroundColor: ["#1F4B4A", "#D98E3B", "#B23A34", "#5B6664"] }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+
+  if (chartEntregas) chartEntregas.destroy();
+  chartEntregas = new Chart(document.getElementById("chart-entregas"), {
+    type: "doughnut",
+    data: {
+      labels: ["Mercado", "Material"],
+      datasets: [{ data: [entregasMercado, entregasMaterial], backgroundColor: ["#1F4B4A", "#D98E3B"] }],
+    },
+    options: { responsive: true, maintainAspectRatio: false },
+  });
+
+  const stockMercado = inventario.filter((i) => i.categoria === "mercado").reduce((acc, i) => acc + num(i.stock), 0);
+  const stockMaterial = inventario.filter((i) => i.categoria === "material").reduce((acc, i) => acc + num(i.stock), 0);
+  if (chartInventario) chartInventario.destroy();
+  chartInventario = new Chart(document.getElementById("chart-inventario"), {
+    type: "bar",
+    data: {
+      labels: ["Mercado", "Material"],
+      datasets: [{ data: [stockMercado, stockMaterial], backgroundColor: ["#1F4B4A", "#D98E3B"] }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: "y",
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+}
+
+// ============================================================
+// IMPORTAR RESUMEN GENERAL DESDE EXCEL
+// ============================================================
+const btnImportarResumen = document.getElementById("btn-importar-resumen");
+const inputExcelResumen = document.getElementById("input-excel-resumen");
+
+btnImportarResumen.addEventListener("click", () => inputExcelResumen.click());
+
+const MAPA_COLUMNAS_RESUMEN = {
+  familias: ["familias"],
+  personas: ["personas"],
+  viviendasHabitables: ["viviendas habitables"],
+  viviendasNoHabitables: ["viviendas no habitables"],
+  viviendasDestruidas: ["viviendas destruidas"],
+  viviendasAveriadas: ["viviendas averiadas"],
+};
+
+inputExcelResumen.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const libro = XLSX.read(buffer, { type: "array" });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+
+    if (filas.length === 0) {
+      mostrarToast("El archivo no tiene filas de datos.", true);
+      return;
+    }
+
+    // Si hay varias filas (por ejemplo una por vereda), se suman todas para el total general.
+    const totales = { familias: 0, personas: 0, viviendasHabitables: 0, viviendasNoHabitables: 0, viviendasDestruidas: 0, viviendasAveriadas: 0 };
+    filas.forEach((fila) => {
+      for (const campo of Object.keys(MAPA_COLUMNAS_RESUMEN)) {
+        totales[campo] += Number(buscarColumna(fila, MAPA_COLUMNAS_RESUMEN[campo])) || 0;
+      }
+    });
+
+    if (!confirm(`Se va a reemplazar el resumen general con:\n\nFamilias: ${totales.familias}\nPersonas: ${totales.personas}\nViviendas habitables: ${totales.viviendasHabitables}\nViviendas no habitables: ${totales.viviendasNoHabitables}\nViviendas destruidas: ${totales.viviendasDestruidas}\nViviendas averiadas: ${totales.viviendasAveriadas}\n\n¿Continuar?`)) {
+      inputExcelResumen.value = "";
+      return;
+    }
+
+    await setDoc(doc(db, "resumen", "general"), {
+      ...totales,
+      actualizadoEn: serverTimestamp(),
+      actualizadoPor: auth.currentUser.email,
+    });
+
+    mostrarToast("Resumen general actualizado.");
+  } catch (err) {
+    console.error(err);
+    mostrarToast("No se pudo leer el archivo. Verifica que sea un Excel o CSV válido.", true);
+  } finally {
+    inputExcelResumen.value = "";
+  }
+});
+
+// ============================================================
 // IMPORTAR DAMNIFICADOS DESDE EXCEL
 // ============================================================
 const btnImportar = document.getElementById("btn-importar-excel");
@@ -1037,6 +1225,7 @@ const CAMPOS_SINO = ["viviendaAveriadaTecho", "viviendaAveriadaPared", "vivienda
 function normalizarTexto(s) {
   return String(s ?? "")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quita acentos, sin importar cómo estén codificados
+    .replace(/_/g, " ")
     .trim()
     .toLowerCase();
 }
