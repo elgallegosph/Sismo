@@ -51,5 +51,12 @@ service cloud.firestore {
       allow read: if estaAutenticado();
       allow write: if esAdmin();
     }
+
+    // Resumen general del dashboard (familias, personas, viviendas por estado):
+    // cualquiera autenticado puede ver; solo admin puede importar/actualizar.
+    match /resumen/{docId} {
+      allow read: if estaAutenticado();
+      allow write: if esAdmin();
+    }
   }
 }
