@@ -165,9 +165,13 @@
         <header class="panel-header">
           <div>
             <h2>Inventario</h2>
-            <p class="panel-hint">Existencias actuales de mercados y materiales.</p>
+            <p class="panel-hint">Existencias actuales de mercados, materiales y kits de aseo.</p>
           </div>
-          <button class="btn btn-primary" id="btn-agregar-item" data-open-modal="modal-item">Agregar artículo</button>
+          <div class="header-actions">
+            <button class="btn btn-secondary" id="btn-importar-inventario">Importar inventario (Excel)</button>
+            <button class="btn btn-primary" id="btn-agregar-item" data-open-modal="modal-item">Agregar artículo</button>
+          </div>
+          <input type="file" id="input-excel-inventario" accept=".xlsx,.xls,.csv" hidden />
         </header>
 
         <div class="inventory-columns">
