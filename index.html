@@ -414,7 +414,7 @@
   </div>
 
   <div class="modal-overlay" id="modal-salida" hidden>
-    <div class="modal">
+    <div class="modal modal-wide">
       <h3>Registrar entrega</h3>
       <form id="form-salida" class="modal-form">
         <label>Persona que recibe
@@ -427,18 +427,24 @@
         <input type="hidden" id="salida-entregado-parentesco" />
         <p id="salida-damnificado-elegido" class="chosen-note" hidden></p>
 
+        <h4 class="modal-section">Agregar artículo a la entrega</h4>
         <label>Categoría
-          <select id="salida-categoria" required>
+          <select id="salida-categoria">
             <option value="mercado">Mercado</option>
             <option value="material">Material</option>
             <option value="kit">Kit de aseo</option>
           </select>
         </label>
         <label>Artículo
-          <select id="salida-item" required></select>
+          <select id="salida-item"></select>
         </label>
-        <label>Cantidad <input type="number" min="0.01" step="any" id="salida-cantidad" required /></label>
+        <label>Cantidad <input type="number" min="0.01" step="any" id="salida-cantidad" /></label>
         <p id="salida-stock-info" class="chosen-note"></p>
+        <button type="button" class="btn btn-secondary btn-small" id="btn-agregar-linea-entrega">Agregar a la entrega</button>
+
+        <h4 class="modal-section">Artículos en esta entrega</h4>
+        <div id="salida-lineas"></div>
+
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
           <button type="submit" class="btn btn-primary">Registrar entrega</button>
