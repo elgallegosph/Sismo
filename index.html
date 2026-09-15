@@ -15,6 +15,7 @@
   <!-- ===================== PANTALLA DE INGRESO ===================== -->
   <section id="login-screen" class="login-screen">
     <div class="login-card">
+      <img src="img/logo-alcaldia.png" alt="Alcaldía de San José" class="login-logo" />
       <p class="login-eyebrow">Registro de damnificados</p>
       <h1 class="login-title">Sismo 10 de agosto</h1>
       <p class="login-sub">Ingresa con la cuenta que te asignó el coordinador de la brigada.</p>
@@ -39,6 +40,7 @@
 
     <aside class="sidebar">
       <div class="sidebar-top">
+        <img src="img/logo-alcaldia.png" alt="Alcaldía de San José" class="sidebar-logo" />
         <p class="brand-eyebrow">Respuesta a emergencia</p>
         <h1 class="brand-title">Sismo<br/>10 de agosto</h1>
       </div>
@@ -115,6 +117,7 @@
           <div class="count-card"><div class="n" id="op-familiares">—</div><div class="label">Integrantes de núcleo familiar</div></div>
           <div class="count-card"><div class="n" id="op-entregas-mercado">—</div><div class="label">Entregas de mercado</div></div>
           <div class="count-card"><div class="n" id="op-entregas-material">—</div><div class="label">Entregas de materiales</div></div>
+          <div class="count-card"><div class="n" id="op-entregas-kit">—</div><div class="label">Entregas de kits de aseo</div></div>
           <div class="count-card"><div class="n" id="op-agotados">—</div><div class="label">Artículos agotados</div></div>
         </div>
       </section>
@@ -145,11 +148,12 @@
                 <th>Teléfono</th>
                 <th>Mercados entregados</th>
                 <th>Materiales entregados</th>
+                <th>Kits de aseo entregados</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="tabla-damnificados">
-              <tr class="empty-row"><td colspan="7">Cargando registros…</td></tr>
+              <tr class="empty-row"><td colspan="8">Cargando registros…</td></tr>
             </tbody>
           </table>
         </div>
@@ -181,6 +185,15 @@
               <table class="data-table">
                 <thead><tr><th>Artículo</th><th>Unidad</th><th>Stock</th><th></th></tr></thead>
                 <tbody id="tabla-inventario-material"><tr class="empty-row"><td colspan="4">Cargando…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h3 class="inventory-subtitle">Kits de aseo</h3>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Artículo</th><th>Unidad</th><th>Stock</th><th></th></tr></thead>
+                <tbody id="tabla-inventario-kit"><tr class="empty-row"><td colspan="4">Cargando…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -334,6 +347,7 @@
           <select id="item-categoria" required>
             <option value="mercado">Mercado</option>
             <option value="material">Material</option>
+            <option value="kit">Kit de aseo</option>
           </select>
         </label>
         <label>Nombre del artículo <input type="text" id="item-nombre" required /></label>
@@ -356,6 +370,7 @@
           <select id="entrada-categoria" required>
             <option value="mercado">Mercado</option>
             <option value="material">Material</option>
+            <option value="kit">Kit de aseo</option>
           </select>
         </label>
         <label>Artículo
@@ -390,6 +405,7 @@
           <select id="salida-categoria" required>
             <option value="mercado">Mercado</option>
             <option value="material">Material</option>
+            <option value="kit">Kit de aseo</option>
           </select>
         </label>
         <label>Artículo
