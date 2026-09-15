@@ -1320,3 +1320,187 @@ inputExcel.addEventListener("change", async (e) => {
     inputExcel.value = "";
   }
 });
+
+// ============================================================
+// INFORMES (EXPORTAR EXCEL Y PDF)
+// ============================================================
+const btnExportarExcel = document.getElementById("btn-exportar-excel");
+const btnExportarPdf = document.getElementById("btn-exportar-pdf");
+const informeEstado = document.getElementById("informe-estado");
+
+function nombreArchivoConFecha(base, ext) {
+  const fecha = new Date().toISOString().slice(0, 10);
+  return `${base}-${fecha}.${ext}`;
+}
+
+function filasIndicadores() {
+  const filas = [
+    ["Damnificados registrados", damnificados.length],
+    ["Habitantes (suma registrada)", damnificados.reduce((acc, d) => acc + (Number(d.habitantes) || 0), 0)],
+    ["Integrantes de núcleo familiar", familiares.length],
+    ["Entregas de mercado", movimientos.filter((m) => m.tipo === "salida" && m.categoria === "mercado").length],
+    ["Entregas de materiales", movimientos.filter((m) => m.tipo === "salida" && m.categoria === "material").length],
+    ["Entregas de kits de aseo", movimientos.filter((m) => m.tipo === "salida" && m.categoria === "kit").length],
+    ["Artículos agotados", inventario.filter((i) => (i.stock || 0) <= 0).length],
+  ];
+  if (resumen) {
+    filas.push(
+      ["Familias (resumen importado)", resumen.familias || 0],
+      ["Personas (resumen importado)", resumen.personas || 0],
+      ["Viviendas habitables (resumen importado)", resumen.viviendasHabitables || 0],
+      ["Viviendas no habitables (resumen importado)", resumen.viviendasNoHabitables || 0],
+      ["Viviendas destruidas (resumen importado)", resumen.viviendasDestruidas || 0],
+      ["Viviendas averiadas (resumen importado)", resumen.viviendasAveriadas || 0]
+    );
+  }
+  return filas;
+}
+
+btnExportarExcel.addEventListener("click", () => {
+  informeEstado.textContent = "Generando Excel…";
+  try {
+    const libro = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      libro,
+      XLSX.utils.aoa_to_sheet([["Indicador", "Valor"], ...filasIndicadores()]),
+      "Resumen"
+    );
+
+    const filasDamnificados = damnificados.map((d) => ({
+      Nombre: d.nombre || "", Cedula: d.cedula || "", RUD: d.rud || "", Telefono: d.telefono || "",
+      Vereda: d.vereda || "", Direccion: d.direccion || "", "Categoria RUFE": d.categoriaRufe || "",
+      "Formato Ingenieros": d.formatoIngenieros || "", "Tipo de Bien": d.tipoBien || "",
+      "Tenencia Vivienda": d.tenenciaVivienda || "", Habitantes: d.habitantes || 0, Adultos: d.adultos || 0,
+      Menores: d.menores || 0, Edad: d.edad || "", "Enfermedades de Base": d.enfermedadesBase || "",
+      "Afectacion en Servicios": d.afectacionServicios || "",
+      "Vivienda Averiada Techo": d.viviendaAveriadaTecho ? "Si" : "No",
+      "Vivienda Averiada Pared": d.viviendaAveriadaPared ? "Si" : "No",
+      "Vivienda Averiada Pisos": d.viviendaAveriadaPisos ? "Si" : "No",
+      "Vivienda Afectada Estructuralmente": d.viviendaAfectadaEstructural ? "Si" : "No",
+      "Vivienda Colapsada": d.viviendaColapsada ? "Si" : "No",
+      "Formato Desalojo Firmado": d.formatoDesalojoFirmado ? "Si" : "No",
+      Desalojados: d.desalojados ? "Si" : "No",
+      "Edificacion Averiada": d.edificacionAveriada ? "Si" : "No",
+      "Edificacion Afectada Estructuralmente": d.edificacionAfectadaEstructural ? "Si" : "No",
+      "Edificacion Colapsada": d.edificacionColapsada ? "Si" : "No",
+      "Infraestructura Vial Afectada": d.infraestructuraVialAfectada ? "Si" : "No",
+      "Mercados Entregados": contarEntregas(d.id, "mercado"),
+      "Materiales Entregados": contarEntregas(d.id, "material"),
+      "Kits de Aseo Entregados": contarEntregas(d.id, "kit"),
+    }));
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filasDamnificados), "Damnificados");
+
+    const filasInventario = inventario.map((i) => ({
+      Categoria: etiquetaCategoria(i.categoria), Articulo: i.nombre || "", Unidad: i.unidad || "", Stock: i.stock || 0,
+    }));
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filasInventario), "Inventario");
+
+    const filasMovimientos = movimientos.map((m) => {
+      const hogar = damnificados.find((d) => d.id === m.damnificadoId);
+      return {
+        Fecha: m.fecha && m.fecha.seconds ? formatearFecha(m.fecha) : "",
+        Tipo: m.tipo === "entrada" ? "Entrada" : "Salida",
+        Categoria: etiquetaCategoria(m.categoria),
+        Articulo: m.itemNombre || "", Cantidad: m.cantidad || 0,
+        "Entregado a": m.tipo === "salida" ? (m.entregadoNombre || m.damnificadoNombre || "") : "",
+        Parentesco: m.tipo === "salida" ? (m.entregadoParentesco || "") : "",
+        "RUD del hogar": hogar ? hogar.rud : "",
+        Responsable: m.responsable || "",
+      };
+    });
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filasMovimientos), "Movimientos");
+
+    const filasFamiliares = familiares.map((f) => ({
+      Formulario: f.formulario || "", "Nombre completo": f.nombreCompleto || "", Parentesco: f.parentesco || "",
+      "Tipo Documento": f.tipoDocumento || "", "Numero Documento": f.numeroDocumento || "",
+    }));
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filasFamiliares), "Nucleo familiar");
+
+    XLSX.writeFile(libro, nombreArchivoConFecha("informe-sismo-10-agosto", "xlsx"));
+    informeEstado.textContent = "Excel descargado.";
+  } catch (err) {
+    console.error(err);
+    informeEstado.textContent = "No se pudo generar el Excel.";
+  }
+});
+
+btnExportarPdf.addEventListener("click", () => {
+  informeEstado.textContent = "Generando PDF…";
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "landscape", unit: "pt" });
+    const colorEncabezado = [31, 75, 74];
+    let y = 40;
+
+    pdf.setFontSize(16);
+    pdf.text("Informe de Respuesta a Emergencia — Sismo 10 de agosto", 40, y);
+    y += 18;
+    pdf.setFontSize(9);
+    pdf.text(`Generado: ${new Date().toLocaleString("es-CO")} · por ${auth.currentUser?.email || "—"}`, 40, y);
+    y += 20;
+
+    pdf.autoTable({
+      startY: y,
+      head: [["Indicador", "Valor"]],
+      body: filasIndicadores().map(([a, b]) => [a, String(b)]),
+      theme: "grid", styles: { fontSize: 9 }, headStyles: { fillColor: colorEncabezado },
+    });
+    y = pdf.lastAutoTable.finalY + 22;
+
+    pdf.setFontSize(13);
+    pdf.text("Damnificados", 40, y);
+    pdf.autoTable({
+      startY: y + 6,
+      head: [["Nombre", "Cédula", "RUD", "Vereda", "Teléfono", "Habitantes", "Vivienda colapsada", "Mercados", "Materiales", "Kits"]],
+      body: damnificados.map((d) => [
+        d.nombre || "", d.cedula || "", d.rud || "", d.vereda || "", d.telefono || "",
+        d.habitantes || 0, d.viviendaColapsada ? "Sí" : "No",
+        contarEntregas(d.id, "mercado"), contarEntregas(d.id, "material"), contarEntregas(d.id, "kit"),
+      ]),
+      theme: "grid", styles: { fontSize: 8 }, headStyles: { fillColor: colorEncabezado },
+    });
+    y = pdf.lastAutoTable.finalY + 22;
+
+    pdf.setFontSize(13);
+    pdf.text("Inventario", 40, y);
+    pdf.autoTable({
+      startY: y + 6,
+      head: [["Categoría", "Artículo", "Unidad", "Stock"]],
+      body: inventario.map((i) => [etiquetaCategoria(i.categoria), i.nombre || "", i.unidad || "", i.stock || 0]),
+      theme: "grid", styles: { fontSize: 9 }, headStyles: { fillColor: colorEncabezado },
+    });
+    y = pdf.lastAutoTable.finalY + 22;
+
+    pdf.setFontSize(13);
+    pdf.text("Entradas y salidas", 40, y);
+    pdf.autoTable({
+      startY: y + 6,
+      head: [["Fecha", "Tipo", "Categoría", "Artículo", "Cantidad", "Entregado a", "Responsable"]],
+      body: movimientos.map((m) => [
+        formatearFecha(m.fecha), m.tipo === "entrada" ? "Entrada" : "Salida", etiquetaCategoria(m.categoria),
+        m.itemNombre || "", m.cantidad || 0, m.tipo === "salida" ? formatEntregadoA(m) : "—", m.responsable || "",
+      ]),
+      theme: "grid", styles: { fontSize: 8 }, headStyles: { fillColor: colorEncabezado },
+    });
+    y = pdf.lastAutoTable.finalY + 22;
+
+    pdf.setFontSize(13);
+    pdf.text("Núcleo familiar", 40, y);
+    pdf.autoTable({
+      startY: y + 6,
+      head: [["Formulario", "Nombre completo", "Parentesco", "Documento"]],
+      body: familiares.map((f) => [
+        f.formulario || "", f.nombreCompleto || "", f.parentesco || "",
+        `${f.tipoDocumento || ""} ${f.numeroDocumento || ""}`.trim(),
+      ]),
+      theme: "grid", styles: { fontSize: 8 }, headStyles: { fillColor: colorEncabezado },
+    });
+
+    pdf.save(nombreArchivoConFecha("informe-sismo-10-agosto", "pdf"));
+    informeEstado.textContent = "PDF descargado.";
+  } catch (err) {
+    console.error(err);
+    informeEstado.textContent = "No se pudo generar el PDF.";
+  }
+});
