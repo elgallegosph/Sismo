@@ -263,7 +263,7 @@ function renderDamnificados() {
   const filtrados = damnificados.filter((d) => coincideBusqueda(d, filtro));
 
   if (filtrados.length === 0) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${
       filtro ? "Nadie coincide con esa búsqueda." : "Todavía no hay damnificados registrados."
     }</td></tr>`;
     return;
@@ -277,6 +277,7 @@ function renderDamnificados() {
       <td>${escapeHtml(d.telefono || "—")}</td>
       <td><span class="badge badge-count">${contarEntregas(d.id, "mercado")}</span></td>
       <td><span class="badge badge-count">${contarEntregas(d.id, "material")}</span></td>
+      <td><span class="badge badge-count">${contarEntregas(d.id, "kit")}</span></td>
       <td>
         ${rolActual === "admin" ? `
           <button class="btn btn-ghost btn-small" data-editar-damnificado="${d.id}">Editar</button>
@@ -489,6 +490,7 @@ formItem.addEventListener("submit", async (e) => {
 function renderInventario() {
   renderTablaInventario("mercado", "tabla-inventario-mercado");
   renderTablaInventario("material", "tabla-inventario-material");
+  renderTablaInventario("kit", "tabla-inventario-kit");
 }
 
 function renderTablaInventario(categoria, tbodyId) {
@@ -751,7 +753,7 @@ function renderMovimientos() {
     <tr>
       <td>${formatearFecha(m.fecha)}</td>
       <td>${m.tipo === "entrada" ? "Entrada" : "Salida"}</td>
-      <td>${m.categoria === "mercado" ? "Mercado" : "Material"}</td>
+      <td>${etiquetaCategoria(m.categoria)}</td>
       <td>${escapeHtml(m.itemNombre)}</td>
       <td>${m.cantidad}</td>
       <td>${m.tipo === "salida" ? escapeHtml(formatEntregadoA(m)) : "—"}</td>
@@ -789,7 +791,8 @@ function renderReporteSiHayBusqueda() {
   contenedor.innerHTML = coincidencias.map((d) => {
     const entregasMercado = movimientos.filter((m) => m.tipo === "salida" && m.damnificadoId === d.id && m.categoria === "mercado");
     const entregasMaterial = movimientos.filter((m) => m.tipo === "salida" && m.damnificadoId === d.id && m.categoria === "material");
-    const historial = [...entregasMercado, ...entregasMaterial].sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
+    const entregasKit = movimientos.filter((m) => m.tipo === "salida" && m.damnificadoId === d.id && m.categoria === "kit");
+    const historial = [...entregasMercado, ...entregasMaterial, ...entregasKit].sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
     return `
       <div class="reporte-persona">
         <h3>${escapeHtml(d.nombre)}</h3>
@@ -797,6 +800,7 @@ function renderReporteSiHayBusqueda() {
         <div class="reporte-counts">
           <div class="count-card"><div class="n">${entregasMercado.length}</div><div class="label">Entregas de mercado</div></div>
           <div class="count-card"><div class="n">${entregasMaterial.length}</div><div class="label">Entregas de materiales</div></div>
+          <div class="count-card"><div class="n">${entregasKit.length}</div><div class="label">Entregas de kits de aseo</div></div>
         </div>
         <div class="table-wrap">
           <table class="data-table">
@@ -807,7 +811,7 @@ function renderReporteSiHayBusqueda() {
                 : historial.map((m) => `
                     <tr>
                       <td>${formatearFecha(m.fecha)}</td>
-                      <td>${m.categoria === "mercado" ? "Mercado" : "Material"}</td>
+                      <td>${etiquetaCategoria(m.categoria)}</td>
                       <td>${escapeHtml(m.itemNombre)}</td>
                       <td>${m.cantidad}</td>
                       <td>${escapeHtml(formatRecibio(m, d))}</td>
@@ -836,6 +840,10 @@ function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
+}
+
+function etiquetaCategoria(cat) {
+  return { mercado: "Mercado", material: "Material", kit: "Kit de aseo" }[cat] || cat;
 }
 
 // ============================================================
@@ -1038,6 +1046,7 @@ function renderDashboard() {
   const totalFamiliares = familiares.length;
   const entregasMercado = movimientos.filter((m) => m.tipo === "salida" && m.categoria === "mercado").length;
   const entregasMaterial = movimientos.filter((m) => m.tipo === "salida" && m.categoria === "material").length;
+  const entregasKit = movimientos.filter((m) => m.tipo === "salida" && m.categoria === "kit").length;
   const agotados = inventario.filter((i) => (i.stock || 0) <= 0).length;
 
   document.getElementById("op-damnificados").textContent = totalDamnificados.toLocaleString("es-CO");
@@ -1045,6 +1054,7 @@ function renderDashboard() {
   document.getElementById("op-familiares").textContent = totalFamiliares.toLocaleString("es-CO");
   document.getElementById("op-entregas-mercado").textContent = entregasMercado.toLocaleString("es-CO");
   document.getElementById("op-entregas-material").textContent = entregasMaterial.toLocaleString("es-CO");
+  document.getElementById("op-entregas-kit").textContent = entregasKit.toLocaleString("es-CO");
   document.getElementById("op-agotados").textContent = agotados.toLocaleString("es-CO");
 
   // ---------- Tabla de concordancia ----------
@@ -1095,20 +1105,21 @@ function renderDashboard() {
   chartEntregas = new Chart(document.getElementById("chart-entregas"), {
     type: "doughnut",
     data: {
-      labels: ["Mercado", "Material"],
-      datasets: [{ data: [entregasMercado, entregasMaterial], backgroundColor: ["#1F4B4A", "#D98E3B"] }],
+      labels: ["Mercado", "Material", "Kit de aseo"],
+      datasets: [{ data: [entregasMercado, entregasMaterial, entregasKit], backgroundColor: ["#1F4B4A", "#D98E3B", "#5B6664"] }],
     },
     options: { responsive: true, maintainAspectRatio: false },
   });
 
   const stockMercado = inventario.filter((i) => i.categoria === "mercado").reduce((acc, i) => acc + num(i.stock), 0);
   const stockMaterial = inventario.filter((i) => i.categoria === "material").reduce((acc, i) => acc + num(i.stock), 0);
+  const stockKit = inventario.filter((i) => i.categoria === "kit").reduce((acc, i) => acc + num(i.stock), 0);
   if (chartInventario) chartInventario.destroy();
   chartInventario = new Chart(document.getElementById("chart-inventario"), {
     type: "bar",
     data: {
-      labels: ["Mercado", "Material"],
-      datasets: [{ data: [stockMercado, stockMaterial], backgroundColor: ["#1F4B4A", "#D98E3B"] }],
+      labels: ["Mercado", "Material", "Kit de aseo"],
+      datasets: [{ data: [stockMercado, stockMaterial, stockKit], backgroundColor: ["#1F4B4A", "#D98E3B", "#5B6664"] }],
     },
     options: {
       responsive: true, maintainAspectRatio: false, indexAxis: "y",
