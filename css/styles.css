@@ -67,6 +67,7 @@ button, input, select { font-family: inherit; font-size: inherit; }
   max-width: 380px;
 }
 .login-eyebrow { color: var(--color-text-muted); font-weight: 600; margin: 0 0 0.25rem; }
+.login-logo { display: block; width: 96px; height: auto; margin: 0 auto 1.25rem; }
 .login-title { font-size: 1.7rem; font-weight: 800; margin-bottom: 0.75rem; }
 .login-sub { color: var(--color-text-muted); margin-bottom: 1.5rem; }
 .login-form label { display: block; font-weight: 600; margin-bottom: 1rem; font-size: 0.9rem; }
@@ -91,6 +92,16 @@ button, input, select { font-family: inherit; font-size: inherit; }
   overflow-y: auto;
 }
 .brand-eyebrow { color: #A9C7C4; font-weight: 600; font-size: 0.8rem; margin-bottom: 0.4rem; }
+.sidebar-logo {
+  display: block;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 0.9rem;
+}
 .brand-title { font-size: 1.3rem; font-weight: 800; line-height: 1.25; margin-bottom: 2rem; }
 .nav { display: flex; flex-direction: column; gap: 0.25rem; }
 .nav-item {
@@ -173,9 +184,10 @@ button, input, select { font-family: inherit; font-size: inherit; }
 .badge-low { background: #F5DEDB; color: var(--color-danger); }
 .fila-coincidente td { background: #FBF0E0; font-weight: 600; }
 
-.inventory-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.inventory-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
 .inventory-subtitle { font-size: 1rem; font-weight: 700; margin-bottom: 0.6rem; }
-@media (max-width: 900px) { .inventory-columns { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .inventory-columns { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) { .inventory-columns { grid-template-columns: 1fr; } }
 
 .reporte-resultado { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.5rem; }
 .empty-state { color: var(--color-text-muted); }
