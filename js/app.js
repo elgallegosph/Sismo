@@ -86,6 +86,7 @@ function aplicarPermisos() {
   document.getElementById("btn-importar-familiares").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-importar-resumen").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-agregar-item").hidden = !puedeInventario;
+  document.getElementById("btn-importar-inventario").hidden = !puedeInventario;
   document.getElementById("btn-registrar-entrada").hidden = !puedeInventario;
   document.getElementById("btn-registrar-salida").hidden = !puedeInventario;
 
@@ -1006,6 +1007,107 @@ inputExcelFamiliares.addEventListener("change", async (e) => {
     mostrarToast("No se pudo leer el archivo. Verifica que sea un Excel o CSV válido.", true);
   } finally {
     inputExcelFamiliares.value = "";
+  }
+});
+
+// ============================================================
+// IMPORTAR INVENTARIO DESDE EXCEL (Categoría, Descripción/Elemento, Cantidad, Unidad/Detalle)
+// ============================================================
+const btnImportarInventario = document.getElementById("btn-importar-inventario");
+const inputExcelInventario = document.getElementById("input-excel-inventario");
+
+btnImportarInventario.addEventListener("click", () => inputExcelInventario.click());
+
+const MAPA_COLUMNAS_INVENTARIO = {
+  categoria: ["categoria"],
+  nombre: ["descripcion / elemento", "descripcion/elemento", "descripcion", "elemento", "articulo"],
+  cantidad: ["cantidad"],
+  unidad: ["unidad / detalle", "unidad/detalle", "unidad", "detalle"],
+};
+
+function inferirCategoriaInventario(valor) {
+  const t = normalizarTexto(valor);
+  if (t.includes("mercado") || t.includes("alimento") || t.includes("comida")) return "mercado";
+  if (t.includes("aseo") || t.includes("higiene") || t.includes("kit")) return "kit";
+  return "material";
+}
+
+inputExcelInventario.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const libro = XLSX.read(buffer, { type: "array" });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+
+    if (filas.length === 0) {
+      mostrarToast("El archivo no tiene filas de datos.", true);
+      return;
+    }
+
+    const registros = filas.map((fila) => {
+      const categoriaTexto = String(buscarColumna(fila, MAPA_COLUMNAS_INVENTARIO.categoria)).trim();
+      return {
+        categoria: inferirCategoriaInventario(categoriaTexto),
+        categoriaOriginal: categoriaTexto,
+        nombre: String(buscarColumna(fila, MAPA_COLUMNAS_INVENTARIO.nombre)).trim(),
+        stock: Number(buscarColumna(fila, MAPA_COLUMNAS_INVENTARIO.cantidad)) || 0,
+        unidad: String(buscarColumna(fila, MAPA_COLUMNAS_INVENTARIO.unidad)).trim(),
+      };
+    }).filter((r) => r.nombre);
+
+    const omitidos = filas.length - registros.length;
+
+    if (registros.length === 0) {
+      mostrarToast("Ninguna fila tiene un nombre de artículo válido.", true);
+      return;
+    }
+
+    const resumenPorCategoria = registros.reduce((acc, r) => {
+      acc[r.categoria] = (acc[r.categoria] || 0) + 1;
+      return acc;
+    }, {});
+    const resumenTexto = Object.entries(resumenPorCategoria)
+      .map(([cat, n]) => `${etiquetaCategoria(cat)}: ${n}`)
+      .join(", ");
+
+    if (!confirm(`Se van a importar ${registros.length} artículos${omitidos ? ` (se omiten ${omitidos} filas sin nombre)` : ""}.\n\n${resumenTexto}\n\nSi un artículo ya existe (mismo nombre y categoría), se actualiza su cantidad en vez de duplicarse. ¿Continuar?`)) {
+      inputExcelInventario.value = "";
+      return;
+    }
+
+    let creados = 0;
+    let actualizados = 0;
+
+    for (const r of registros) {
+      const existente = inventario.find(
+        (i) => i.categoria === r.categoria && normalizarTexto(i.nombre) === normalizarTexto(r.nombre)
+      );
+      if (existente) {
+        await updateDoc(doc(db, "inventario", existente.id), {
+          stock: r.stock,
+          unidad: r.unidad || existente.unidad,
+        });
+        actualizados++;
+      } else {
+        await addDoc(collection(db, "inventario"), {
+          categoria: r.categoria,
+          nombre: r.nombre,
+          unidad: r.unidad,
+          stock: r.stock,
+        });
+        creados++;
+      }
+    }
+
+    mostrarToast(`Inventario importado: ${creados} artículos nuevos, ${actualizados} actualizados.`);
+  } catch (err) {
+    console.error(err);
+    mostrarToast("No se pudo leer el archivo. Verifica que sea un Excel o CSV válido.", true);
+  } finally {
+    inputExcelInventario.value = "";
   }
 });
 
