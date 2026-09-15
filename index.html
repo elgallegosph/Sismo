@@ -51,6 +51,7 @@
         <button class="nav-item" data-panel="panel-movimientos">Entradas y salidas</button>
         <button class="nav-item" data-panel="panel-reportes">Entregas por persona</button>
         <button class="nav-item" data-panel="panel-nucleo">Núcleo familiar</button>
+        <button class="nav-item" data-panel="panel-informes">Informes</button>
       </nav>
       <div class="sidebar-bottom">
         <p class="session-user">Sesión: <span id="session-email">—</span></p>
@@ -269,6 +270,27 @@
         </div>
       </section>
 
+      <!-- ---------- INFORMES ---------- -->
+      <section id="panel-informes" class="panel">
+        <header class="panel-header">
+          <div>
+            <h2>Informes</h2>
+            <p class="panel-hint">Genera un informe completo con todo lo registrado hasta este momento.</p>
+          </div>
+        </header>
+
+        <div class="informes-botones">
+          <button class="btn btn-primary" id="btn-exportar-excel">Descargar Excel completo</button>
+          <button class="btn btn-secondary" id="btn-exportar-pdf">Descargar informe en PDF</button>
+        </div>
+        <p class="panel-hint" id="informe-estado"></p>
+
+        <div class="informes-detalle">
+          <p><strong>El Excel</strong> incluye una hoja por cada tipo de dato: Resumen, Damnificados (todos los campos), Inventario, Movimientos y Núcleo familiar.</p>
+          <p><strong>El PDF</strong> trae un informe leíble con las mismas secciones, en tablas organizadas, listo para imprimir o compartir.</p>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -425,6 +447,8 @@
   <div id="toast" class="toast" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
