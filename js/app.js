@@ -114,7 +114,11 @@ document.querySelectorAll("[data-open-modal]").forEach((btn) => {
     const modal = document.getElementById(btn.dataset.openModal);
     modal.hidden = false;
     if (modal.id === "modal-entrada") pobladorSelectItem("entrada");
-    if (modal.id === "modal-salida") pobladorSelectItem("salida");
+    if (modal.id === "modal-salida") {
+      pobladorSelectItem("salida");
+      lineasEntregaActuales = [];
+      renderLineasEntrega();
+    }
   });
 });
 document.querySelectorAll("[data-close-modal]").forEach((btn) => {
@@ -584,11 +588,13 @@ formEntrada.addEventListener("submit", async (e) => {
 });
 
 // ============================================================
-// MOVIMIENTOS: SALIDA (entrega a un damnificado o a un integrante de su núcleo familiar)
+// MOVIMIENTOS: SALIDA (entrega a un damnificado o a un integrante de su núcleo familiar,
+// con varios artículos de cualquier categoría en una sola entrega)
 // ============================================================
 const buscarSalidaInput = document.getElementById("salida-buscar-damnificado");
 const resultadosSalida = document.getElementById("salida-damnificado-resultados");
 let resultadosSalidaActuales = [];
+let lineasEntregaActuales = [];
 
 // Busca coincidencias tanto en la lista de damnificados (jefes de hogar) como en el
 // núcleo familiar importado — pero un integrante del núcleo familiar solo puede recibir
@@ -670,6 +676,71 @@ buscarSalidaInput.addEventListener("input", () => {
   });
 });
 
+function renderLineasEntrega() {
+  const cont = document.getElementById("salida-lineas");
+  if (!cont) return;
+  if (lineasEntregaActuales.length === 0) {
+    cont.innerHTML = `<p class="empty-state">Todavía no has agregado artículos a esta entrega.</p>`;
+    return;
+  }
+  cont.innerHTML = `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Categoría</th><th>Artículo</th><th>Cantidad</th><th></th></tr></thead>
+        <tbody>
+          ${lineasEntregaActuales.map((l, idx) => `
+            <tr>
+              <td>${etiquetaCategoria(l.categoria)}</td>
+              <td>${escapeHtml(l.itemNombre)}</td>
+              <td>${l.cantidad} ${escapeHtml(l.itemUnidad || "")}</td>
+              <td><button type="button" class="btn btn-ghost btn-small" data-quitar-linea="${idx}">Quitar</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  cont.querySelectorAll("[data-quitar-linea]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      lineasEntregaActuales.splice(Number(btn.dataset.quitarLinea), 1);
+      renderLineasEntrega();
+    });
+  });
+}
+
+document.getElementById("btn-agregar-linea-entrega").addEventListener("click", () => {
+  const errorEl = formSalida.querySelector(".form-error");
+  errorEl.hidden = true;
+
+  const categoria = document.getElementById("salida-categoria").value;
+  const itemId = document.getElementById("salida-item").value;
+  const cantidad = Number(document.getElementById("salida-cantidad").value);
+  const item = inventario.find((i) => i.id === itemId);
+
+  if (!item || !cantidad || cantidad <= 0) {
+    errorEl.textContent = "Selecciona un artículo y una cantidad válida antes de agregarlo.";
+    errorEl.hidden = false;
+    return;
+  }
+
+  const lineaExistente = lineasEntregaActuales.find((l) => l.itemId === itemId);
+  const cantidadYaAgregada = lineaExistente ? lineaExistente.cantidad : 0;
+  if (cantidadYaAgregada + cantidad > (item.stock || 0)) {
+    errorEl.textContent = `No hay suficiente stock de "${item.nombre}" (disponible: ${item.stock || 0}, ya agregado en esta entrega: ${cantidadYaAgregada}).`;
+    errorEl.hidden = false;
+    return;
+  }
+
+  if (lineaExistente) {
+    lineaExistente.cantidad += cantidad;
+  } else {
+    lineasEntregaActuales.push({ categoria, itemId, itemNombre: item.nombre, itemUnidad: item.unidad, cantidad });
+  }
+
+  document.getElementById("salida-cantidad").value = "";
+  renderLineasEntrega();
+});
+
 const formSalida = document.getElementById("form-salida");
 formSalida.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -680,9 +751,6 @@ formSalida.addEventListener("submit", async (e) => {
   const entregadoNombre = document.getElementById("salida-entregado-nombre").value;
   const entregadoDocumento = document.getElementById("salida-entregado-documento").value;
   const entregadoParentesco = document.getElementById("salida-entregado-parentesco").value;
-  const itemId = document.getElementById("salida-item").value;
-  const cantidad = Number(document.getElementById("salida-cantidad").value);
-  const item = inventario.find((i) => i.id === itemId);
   const damnificado = damnificados.find((d) => d.id === damnificadoId);
 
   if (!damnificado || !entregadoNombre) {
@@ -690,46 +758,57 @@ formSalida.addEventListener("submit", async (e) => {
     errorEl.hidden = false;
     return;
   }
-  if (!item || !cantidad || cantidad <= 0) {
-    errorEl.textContent = "Selecciona un artículo y una cantidad válida.";
+  if (lineasEntregaActuales.length === 0) {
+    errorEl.textContent = "Agrega al menos un artículo a la entrega.";
     errorEl.hidden = false;
     return;
   }
 
   try {
     await runTransaction(db, async (tx) => {
-      const itemRef = doc(db, "inventario", itemId);
-      const itemSnap = await tx.get(itemRef);
-      const stockActual = itemSnap.data().stock || 0;
-      if (cantidad > stockActual) {
-        throw new Error("STOCK_INSUFICIENTE");
+      // Firestore exige leer todo antes de escribir nada dentro de una misma transacción.
+      const lecturas = [];
+      for (const linea of lineasEntregaActuales) {
+        const itemRef = doc(db, "inventario", linea.itemId);
+        const snap = await tx.get(itemRef);
+        const stockActual = snap.exists() ? (snap.data().stock || 0) : 0;
+        if (linea.cantidad > stockActual) {
+          throw new Error(`STOCK_INSUFICIENTE:${linea.itemNombre}`);
+        }
+        lecturas.push({ itemRef, stockActual, linea });
       }
-      tx.update(itemRef, { stock: stockActual - cantidad });
-      tx.set(doc(collection(db, "movimientos")), {
-        tipo: "salida",
-        categoria: item.categoria,
-        itemId,
-        itemNombre: item.nombre,
-        cantidad,
-        damnificadoId,
-        damnificadoNombre: damnificado.nombre,
-        damnificadoCedula: damnificado.cedula,
-        entregadoNombre,
-        entregadoDocumento,
-        entregadoParentesco,
-        fecha: serverTimestamp(),
-        responsable: auth.currentUser.email,
+      lecturas.forEach(({ itemRef, stockActual, linea }) => {
+        tx.update(itemRef, { stock: stockActual - linea.cantidad });
+        tx.set(doc(collection(db, "movimientos")), {
+          tipo: "salida",
+          categoria: linea.categoria,
+          itemId: linea.itemId,
+          itemNombre: linea.itemNombre,
+          cantidad: linea.cantidad,
+          damnificadoId,
+          damnificadoNombre: damnificado.nombre,
+          damnificadoCedula: damnificado.cedula,
+          entregadoNombre,
+          entregadoDocumento,
+          entregadoParentesco,
+          fecha: serverTimestamp(),
+          responsable: auth.currentUser.email,
+        });
       });
     });
-    mostrarToast("Entrega registrada y stock actualizado.");
+    mostrarToast(`Entrega registrada con ${lineasEntregaActuales.length} artículo(s).`);
     formSalida.reset();
     resultadosSalida.innerHTML = "";
     limpiarSeleccionSalida();
+    lineasEntregaActuales = [];
+    renderLineasEntrega();
     cerrarModal("modal-salida");
   } catch (err) {
-    errorEl.textContent = err.message === "STOCK_INSUFICIENTE"
-      ? "No hay suficiente stock para esta entrega."
-      : "No se pudo registrar la entrega.";
+    if (typeof err.message === "string" && err.message.startsWith("STOCK_INSUFICIENTE:")) {
+      errorEl.textContent = `No hay suficiente stock de "${err.message.split(":")[1]}" para completar esta entrega. No se guardó ningún artículo.`;
+    } else {
+      errorEl.textContent = "No se pudo registrar la entrega.";
+    }
     errorEl.hidden = false;
   }
 });
