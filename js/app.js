@@ -476,21 +476,52 @@ formItem.addEventListener("submit", async (e) => {
   e.preventDefault();
   const errorEl = formItem.querySelector(".form-error");
   errorEl.hidden = true;
+  const datos = {
+    categoria: document.getElementById("item-categoria").value,
+    nombre: document.getElementById("item-nombre").value.trim(),
+    unidad: document.getElementById("item-unidad").value.trim(),
+  };
   try {
-    await addDoc(collection(db, "inventario"), {
-      categoria: document.getElementById("item-categoria").value,
-      nombre: document.getElementById("item-nombre").value.trim(),
-      unidad: document.getElementById("item-unidad").value.trim(),
-      stock: Number(document.getElementById("item-stock").value) || 0,
-    });
-    mostrarToast("Artículo agregado al inventario.");
+    const id = document.getElementById("item-id").value;
+    if (id) {
+      await updateDoc(doc(db, "inventario", id), datos);
+      mostrarToast("Artículo actualizado.");
+    } else {
+      await addDoc(collection(db, "inventario"), {
+        ...datos,
+        stock: Number(document.getElementById("item-stock").value) || 0,
+      });
+      mostrarToast("Artículo agregado al inventario.");
+    }
     formItem.reset();
+    document.getElementById("item-id").value = "";
     cerrarModal("modal-item");
   } catch (err) {
     errorEl.textContent = "No se pudo guardar el artículo.";
     errorEl.hidden = false;
   }
 });
+
+document.getElementById("btn-agregar-item").addEventListener("click", () => {
+  formItem.reset();
+  document.getElementById("item-id").value = "";
+  document.getElementById("modal-item-titulo").textContent = "Agregar artículo al inventario";
+  document.getElementById("item-stock-label").hidden = false;
+});
+
+function abrirEdicionItem(id) {
+  const i = inventario.find((x) => x.id === id);
+  if (!i) return;
+  document.getElementById("item-id").value = i.id;
+  document.getElementById("item-categoria").value = i.categoria || "mercado";
+  document.getElementById("item-nombre").value = i.nombre || "";
+  document.getElementById("item-unidad").value = i.unidad || "";
+  document.getElementById("modal-item-titulo").textContent = "Editar artículo del inventario";
+  // El stock no se edita aquí para no descuadrar el historial de entradas/salidas;
+  // se ajusta registrando una entrada o salida.
+  document.getElementById("item-stock-label").hidden = true;
+  document.getElementById("modal-item").hidden = false;
+}
 
 function renderInventario() {
   renderTablaInventario("mercado", "tabla-inventario-mercado");
@@ -510,9 +541,16 @@ function renderTablaInventario(categoria, tbodyId) {
       <td>${escapeHtml(i.nombre)}</td>
       <td>${escapeHtml(i.unidad)}</td>
       <td>${i.stock <= 0 ? `<span class="badge badge-low">0 — agotado</span>` : i.stock}</td>
-      <td>${rolActual === "admin" ? `<button class="btn btn-ghost btn-small" data-eliminar-item="${i.id}">Eliminar</button>` : ""}</td>
+      <td>
+        ${(rolActual === "admin" || rolActual === "inventario") ? `<button class="btn btn-ghost btn-small" data-editar-item="${i.id}">Editar</button>` : ""}
+        ${rolActual === "admin" ? `<button class="btn btn-ghost btn-small" data-eliminar-item="${i.id}">Eliminar</button>` : ""}
+      </td>
     </tr>
   `).join("");
+
+  tbody.querySelectorAll("[data-editar-item]").forEach((btn) => {
+    btn.addEventListener("click", () => abrirEdicionItem(btn.dataset.editarItem));
+  });
 
   tbody.querySelectorAll("[data-eliminar-item]").forEach((btn) => {
     btn.addEventListener("click", async () => {
