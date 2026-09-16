@@ -367,8 +367,9 @@
 
   <div class="modal-overlay" id="modal-item" hidden>
     <div class="modal">
-      <h3>Agregar artículo al inventario</h3>
+      <h3 id="modal-item-titulo">Agregar artículo al inventario</h3>
       <form id="form-item" class="modal-form">
+        <input type="hidden" id="item-id" />
         <label>Categoría
           <select id="item-categoria" required>
             <option value="mercado">Mercado</option>
@@ -378,7 +379,7 @@
         </label>
         <label>Nombre del artículo <input type="text" id="item-nombre" required /></label>
         <label>Unidad de medida <input type="text" id="item-unidad" placeholder="kg, caja, unidad…" required /></label>
-        <label>Stock inicial <input type="number" min="0" step="any" id="item-stock" value="0" required /></label>
+        <label id="item-stock-label">Stock inicial <input type="number" min="0" step="any" id="item-stock" value="0" required /></label>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar</button>
