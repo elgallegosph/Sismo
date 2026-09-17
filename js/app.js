@@ -87,6 +87,7 @@ function aplicarPermisos() {
   document.getElementById("btn-importar-familiares").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-importar-resumen").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-importar-entregas").hidden = !puedeEditarDamnificados;
+  document.getElementById("btn-borrar-entregas").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-registrar-sin-rud").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-agregar-item").hidden = !puedeInventario;
   document.getElementById("btn-importar-inventario").hidden = !puedeInventario;
@@ -1449,6 +1450,51 @@ inputExcelInventario.addEventListener("change", async (e) => {
     mostrarToast("No se pudo leer el archivo. Verifica que sea un Excel o CSV válido.", true);
   } finally {
     inputExcelInventario.value = "";
+  }
+});
+
+// ============================================================
+// BORRAR TODAS LAS ENTREGAS (para volver a importar el Excel desde cero)
+// ============================================================
+document.getElementById("btn-borrar-entregas").addEventListener("click", async () => {
+  const salidas = movimientos.filter((m) => m.tipo === "salida");
+  if (salidas.length === 0) {
+    mostrarToast("No hay entregas registradas para borrar.");
+    return;
+  }
+  if (!confirm(`Vas a borrar TODAS las entregas registradas (${salidas.length} registros) y devolver esas cantidades al stock de cada artículo. Esta acción no se puede deshacer.\n\n¿Continuar?`)) {
+    return;
+  }
+  if (!confirm("Confirma una última vez: esto borra por completo el historial de entregas actual. ¿Seguro que quieres continuar?")) {
+    return;
+  }
+
+  try {
+    mostrarToast("Borrando entregas, esto puede tardar unos segundos…");
+
+    // Sumar cuánto hay que devolverle a cada artículo, y hacerlo en un solo ajuste por artículo.
+    const devolucionPorItem = new Map();
+    salidas.forEach((m) => {
+      if (!m.itemId) return;
+      devolucionPorItem.set(m.itemId, (devolucionPorItem.get(m.itemId) || 0) + (Number(m.cantidad) || 0));
+    });
+    for (const [itemId, cantidad] of devolucionPorItem) {
+      const item = inventario.find((i) => i.id === itemId);
+      if (!item) continue;
+      await updateDoc(doc(db, "inventario", itemId), { stock: (item.stock || 0) + cantidad });
+    }
+
+    const LOTE = 400;
+    for (let i = 0; i < salidas.length; i += LOTE) {
+      const batch = writeBatch(db);
+      salidas.slice(i, i + LOTE).forEach((m) => batch.delete(doc(db, "movimientos", m.id)));
+      await batch.commit();
+    }
+
+    mostrarToast(`Se borraron ${salidas.length} entregas y se devolvió el stock correspondiente.`);
+  } catch (err) {
+    console.error(err);
+    mostrarToast("No se pudo completar el borrado. Intenta de nuevo.", true);
   }
 });
 
