@@ -58,5 +58,12 @@ service cloud.firestore {
       allow read: if estaAutenticado();
       allow write: if esAdmin();
     }
+
+    // Personas que reciben entregas pero no tienen RUD ni pertenecen a un núcleo familiar
+    // registrado: cualquiera autenticado puede ver; solo admin puede crear/editar/borrar.
+    match /personas_sin_rud/{docId} {
+      allow read: if estaAutenticado();
+      allow write: if esAdmin();
+    }
   }
 }
