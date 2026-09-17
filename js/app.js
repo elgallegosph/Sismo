@@ -1712,6 +1712,7 @@ function renderDashboard() {
   document.getElementById("op-entregas-kit").textContent = entregasKit.toLocaleString("es-CO");
   document.getElementById("op-agotados").textContent = agotados.toLocaleString("es-CO");
 
+ 
   // ---------- Disponible por categoría (stock actual menos lo entregado) ----------
   const stockMercado = inventario.filter((i) => i.categoria === "mercado").reduce((acc, i) => acc + num(i.stock), 0);
   const stockMaterial = inventario.filter((i) => i.categoria === "material").reduce((acc, i) => acc + num(i.stock), 0);
