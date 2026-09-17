@@ -91,6 +91,7 @@ function aplicarPermisos() {
   document.getElementById("btn-registrar-sin-rud").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-agregar-item").hidden = !puedeInventario;
   document.getElementById("btn-importar-inventario").hidden = !puedeInventario;
+  document.getElementById("btn-recalcular-stock").hidden = !(rolActual === "admin");
   document.getElementById("btn-registrar-entrada").hidden = !puedeInventario;
   document.getElementById("btn-registrar-salida").hidden = !puedeInventario;
 
@@ -595,6 +596,51 @@ function actualizarInfoStockSalida() {
   const item = inventario.find((i) => i.id === itemId);
   const info = document.getElementById("salida-stock-info");
   info.textContent = item ? `Stock disponible: ${item.stock} ${item.unidad}` : "";
+}
+
+// ============================================================
+// RECALCULAR STOCK SEGÚN LAS SALIDAS YA REGISTRADAS
+// (útil cuando una reimportación del Excel de inventario pisó el stock
+// y dejó las entregas ya hechas sin descontar)
+// ============================================================
+document.getElementById("btn-recalcular-stock").addEventListener("click", async () => {
+  const totalSalidasPorItem = new Map();
+  movimientos.forEach((m) => {
+    if (m.tipo !== "salida" || !m.itemId) return;
+    totalSalidasPorItem.set(m.itemId, (totalSalidasPorItem.get(m.itemId) || 0) + (Number(m.cantidad) || 0));
+  });
+
+  const itemsAAjustar = inventario.filter((i) => totalSalidasPorItem.has(i.id));
+  if (itemsAAjustar.length === 0) {
+    mostrarToast("No hay salidas registradas para descontar.", true);
+    return;
+  }
+
+  const resumen = itemsAAjustar
+    .map((i) => `${i.nombre}: ${i.stock} − ${totalSalidasPorItem.get(i.id)} = ${i.stock - totalSalidasPorItem.get(i.id)}`)
+    .slice(0, 10)
+    .join("\n");
+  const masTexto = itemsAAjustar.length > 10 ? `\n… y ${itemsAAjustar.length - 10} artículo(s) más.` : "";
+
+  if (!confirm(
+    `Esto le va a restar a CADA artículo el total de todas sus salidas ya registradas en el historial, de una sola vez:\n\n${resumen}${masTexto}\n\n` +
+    `Úsalo solo si el stock actual todavía NO tiene esas salidas descontadas (por ejemplo, después de reimportar el Excel de inventario). ` +
+    `Si ya estaban descontadas, esto las restaría dos veces. ¿Continuar?`
+  )) {
+    return;
+  }
+
+  try {
+    for (const item of itemsAAjustar) {
+      const totalSalidas = totalSalidasPorItem.get(item.id);
+      await updateDoc(doc(db, "inventario", item.id), { stock: (item.stock || 0) - totalSalidas });
+    }
+    mostrarToast(`Stock recalculado en ${itemsAAjustar.length} artículo(s).`);
+  } catch (err) {
+    console.error(err);
+    mostrarToast("No se pudo recalcular el stock.", true);
+  }
+});
 }
 
 // ============================================================
