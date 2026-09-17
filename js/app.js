@@ -18,6 +18,7 @@ let inventario = [];
 let movimientos = [];
 let familiares = [];
 let resumen = null;
+let personasSinRud = [];
 let damnificadoEnEdicion = null; // referencia al damnificado que está abierto en el modal, para refrescar su núcleo familiar en vivo
 
 // ============================================================
@@ -85,6 +86,8 @@ function aplicarPermisos() {
   document.getElementById("btn-registrar-damnificado").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-importar-familiares").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-importar-resumen").hidden = !puedeEditarDamnificados;
+  document.getElementById("btn-importar-entregas").hidden = !puedeEditarDamnificados;
+  document.getElementById("btn-registrar-sin-rud").hidden = !puedeEditarDamnificados;
   document.getElementById("btn-agregar-item").hidden = !puedeInventario;
   document.getElementById("btn-importar-inventario").hidden = !puedeInventario;
   document.getElementById("btn-registrar-entrada").hidden = !puedeInventario;
@@ -177,6 +180,7 @@ function iniciarListeners() {
     renderDamnificados();
     renderReporteSiHayBusqueda();
     renderDashboard();
+    renderSinRud();
   });
 
   onSnapshot(collection(db, "familiares"), (snap) => {
@@ -192,6 +196,11 @@ function iniciarListeners() {
   onSnapshot(doc(db, "resumen", "general"), (snap) => {
     resumen = snap.exists() ? snap.data() : null;
     renderDashboard();
+  });
+
+  onSnapshot(collection(db, "personas_sin_rud"), (snap) => {
+    personasSinRud = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderSinRud();
   });
 }
 
@@ -643,6 +652,7 @@ function buscarPersonasEntregables(filtro) {
   damnificados.forEach((d) => {
     if (coincideBusqueda(d, filtro)) {
       resultados.push({
+        tipoBeneficiario: "damnificado",
         damnificadoId: d.id,
         damnificadoNombre: d.nombre,
         damnificadoCedula: d.cedula,
@@ -663,6 +673,7 @@ function buscarPersonasEntregables(filtro) {
       (f.numeroDocumento || "").toLowerCase().includes(filtro);
     if (coincide) {
       resultados.push({
+        tipoBeneficiario: "damnificado",
         damnificadoId: damnificado.id,
         damnificadoNombre: damnificado.nombre,
         damnificadoCedula: damnificado.cedula,
@@ -675,11 +686,26 @@ function buscarPersonasEntregables(filtro) {
     }
   });
 
+  personasSinRud.forEach((p) => {
+    if (coincideBusquedaSinRud(p, filtro)) {
+      resultados.push({
+        tipoBeneficiario: "sin_rud",
+        personaSinRudId: p.id,
+        entregadoNombre: p.nombre,
+        entregadoDocumento: p.cedula || "",
+        entregadoParentesco: "Sin RUD ni núcleo asociado",
+        etiqueta: `${p.nombre} — Sin RUD ni núcleo asociado ${p.cedula ? `(CC ${p.cedula})` : ""}`,
+      });
+    }
+  });
+
   return resultados.slice(0, 8);
 }
 
 function limpiarSeleccionSalida() {
   document.getElementById("salida-damnificado-id").value = "";
+  document.getElementById("salida-tipo-beneficiario").value = "";
+  document.getElementById("salida-persona-sin-rud-id").value = "";
   document.getElementById("salida-entregado-nombre").value = "";
   document.getElementById("salida-entregado-documento").value = "";
   document.getElementById("salida-entregado-parentesco").value = "";
@@ -699,16 +725,22 @@ buscarSalidaInput.addEventListener("input", () => {
   resultadosSalida.querySelectorAll(".autocomplete-item").forEach((el) => {
     el.addEventListener("click", () => {
       const r = resultadosSalidaActuales[Number(el.dataset.idx)];
-      document.getElementById("salida-damnificado-id").value = r.damnificadoId;
+      document.getElementById("salida-tipo-beneficiario").value = r.tipoBeneficiario;
+      document.getElementById("salida-damnificado-id").value = r.damnificadoId || "";
+      document.getElementById("salida-persona-sin-rud-id").value = r.personaSinRudId || "";
       document.getElementById("salida-entregado-nombre").value = r.entregadoNombre;
       document.getElementById("salida-entregado-documento").value = r.entregadoDocumento;
       document.getElementById("salida-entregado-parentesco").value = r.entregadoParentesco;
       buscarSalidaInput.value = r.entregadoNombre;
       resultadosSalida.innerHTML = "";
       const nota = document.getElementById("salida-damnificado-elegido");
-      nota.textContent = r.entregadoParentesco === "Jefe de hogar"
-        ? `Se entregará a: ${r.entregadoNombre} (CC ${r.entregadoDocumento}) — Jefe de hogar, RUD ${r.damnificadoRud}`
-        : `Se entregará a: ${r.entregadoNombre} (Doc. ${r.entregadoDocumento || "sin documento"}, ${r.entregadoParentesco}) — núcleo familiar de ${r.damnificadoNombre}, RUD ${r.damnificadoRud}`;
+      if (r.tipoBeneficiario === "sin_rud") {
+        nota.textContent = `Se entregará a: ${r.entregadoNombre}${r.entregadoDocumento ? ` (CC ${r.entregadoDocumento})` : ""} — sin RUD ni núcleo familiar asociado`;
+      } else if (r.entregadoParentesco === "Jefe de hogar") {
+        nota.textContent = `Se entregará a: ${r.entregadoNombre} (CC ${r.entregadoDocumento}) — Jefe de hogar, RUD ${r.damnificadoRud}`;
+      } else {
+        nota.textContent = `Se entregará a: ${r.entregadoNombre} (Doc. ${r.entregadoDocumento || "sin documento"}, ${r.entregadoParentesco}) — núcleo familiar de ${r.damnificadoNombre}, RUD ${r.damnificadoRud}`;
+      }
       nota.hidden = false;
     });
   });
@@ -785,17 +817,44 @@ formSalida.addEventListener("submit", async (e) => {
   const errorEl = formSalida.querySelector(".form-error");
   errorEl.hidden = true;
 
-  const damnificadoId = document.getElementById("salida-damnificado-id").value;
+  const tipoBeneficiario = document.getElementById("salida-tipo-beneficiario").value;
   const entregadoNombre = document.getElementById("salida-entregado-nombre").value;
   const entregadoDocumento = document.getElementById("salida-entregado-documento").value;
   const entregadoParentesco = document.getElementById("salida-entregado-parentesco").value;
-  const damnificado = damnificados.find((d) => d.id === damnificadoId);
 
-  if (!damnificado || !entregadoNombre) {
+  let datosBeneficiario = null;
+  if (tipoBeneficiario === "damnificado") {
+    const damnificadoId = document.getElementById("salida-damnificado-id").value;
+    const damnificado = damnificados.find((d) => d.id === damnificadoId);
+    if (!damnificado) {
+      errorEl.textContent = "Selecciona una persona de la lista de resultados.";
+      errorEl.hidden = false;
+      return;
+    }
+    datosBeneficiario = {
+      damnificadoId,
+      damnificadoNombre: damnificado.nombre,
+      damnificadoCedula: damnificado.cedula,
+    };
+  } else if (tipoBeneficiario === "sin_rud") {
+    const personaSinRudId = document.getElementById("salida-persona-sin-rud-id").value;
+    const persona = personasSinRud.find((p) => p.id === personaSinRudId);
+    if (!persona) {
+      errorEl.textContent = "Selecciona una persona de la lista de resultados.";
+      errorEl.hidden = false;
+      return;
+    }
+    datosBeneficiario = {
+      personaSinRudId,
+      personaSinRudNombre: persona.nombre,
+      personaSinRudCedula: persona.cedula || "",
+    };
+  } else {
     errorEl.textContent = "Selecciona una persona de la lista de resultados.";
     errorEl.hidden = false;
     return;
   }
+
   if (lineasEntregaActuales.length === 0) {
     errorEl.textContent = "Agrega al menos un artículo a la entrega.";
     errorEl.hidden = false;
@@ -823,9 +882,7 @@ formSalida.addEventListener("submit", async (e) => {
           itemId: linea.itemId,
           itemNombre: linea.itemNombre,
           cantidad: linea.cantidad,
-          damnificadoId,
-          damnificadoNombre: damnificado.nombre,
-          damnificadoCedula: damnificado.cedula,
+          ...datosBeneficiario,
           entregadoNombre,
           entregadoDocumento,
           entregadoParentesco,
@@ -855,10 +912,12 @@ formSalida.addEventListener("submit", async (e) => {
 // TABLA DE MOVIMIENTOS
 // ============================================================
 function formatEntregadoA(m) {
-  if (!m.entregadoNombre || m.entregadoNombre === m.damnificadoNombre) {
-    return `${m.damnificadoNombre} (CC ${m.damnificadoCedula})`;
+  const nombreHogar = m.damnificadoNombre || m.personaSinRudNombre || "—";
+  if (!m.entregadoNombre || m.entregadoNombre === nombreHogar) {
+    const documento = m.damnificadoCedula || m.personaSinRudCedula || "";
+    return `${nombreHogar}${documento ? ` (CC ${documento})` : ""}`;
   }
-  return `${m.entregadoNombre} (Doc. ${m.entregadoDocumento || "sin documento"}, ${m.entregadoParentesco || "Familiar"}) — hogar de ${m.damnificadoNombre}`;
+  return `${m.entregadoNombre} (Doc. ${m.entregadoDocumento || "sin documento"}, ${m.entregadoParentesco || "Familiar"})${m.damnificadoId ? ` — hogar de ${nombreHogar}` : ""}`;
 }
 
 function renderMovimientos() {
@@ -1033,6 +1092,91 @@ function renderNucleoPanel() {
     `;
   }).join("<hr style='margin:1.5rem 0;border:none;border-top:1px solid var(--color-border)'>");
 }
+
+// ============================================================
+// PERSONAS SIN RUD (sin damnificado ni núcleo familiar asociado)
+// ============================================================
+function contarEntregasSinRud(personaId, categoria) {
+  return movimientos.filter(
+    (m) => m.tipo === "salida" && m.personaSinRudId === personaId && m.categoria === categoria
+  ).length;
+}
+
+function coincideBusquedaSinRud(p, filtro) {
+  if (!filtro) return true;
+  return [p.nombre, p.cedula, p.rud].some((v) => (v || "").toLowerCase().includes(filtro));
+}
+
+function renderSinRud() {
+  const tbody = document.getElementById("tabla-sin-rud");
+  if (!tbody) return;
+  const filtro = (document.getElementById("buscar-sin-rud")?.value || "").trim().toLowerCase();
+  const filtrados = personasSinRud.filter((p) => coincideBusquedaSinRud(p, filtro));
+
+  if (filtrados.length === 0) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${
+      filtro ? "Nadie coincide con esa búsqueda." : "Todavía no hay personas registradas aquí."
+    }</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtrados.map((p) => `
+    <tr>
+      <td>${escapeHtml(p.nombre)}</td>
+      <td>${escapeHtml(p.cedula || "—")}</td>
+      <td>${escapeHtml(p.rud || "—")}</td>
+      <td><span class="badge badge-count">${contarEntregasSinRud(p.id, "mercado")}</span></td>
+      <td><span class="badge badge-count">${contarEntregasSinRud(p.id, "material")}</span></td>
+      <td><span class="badge badge-count">${contarEntregasSinRud(p.id, "kit")}</span></td>
+      <td>${rolActual === "admin" ? `<button class="btn btn-ghost btn-small" data-eliminar-sin-rud="${p.id}">Eliminar</button>` : ""}</td>
+    </tr>
+  `).join("");
+
+  tbody.querySelectorAll("[data-eliminar-sin-rud]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const p = personasSinRud.find((x) => x.id === btn.dataset.eliminarSinRud);
+      if (!p) return;
+      if (confirm(`¿Eliminar a ${p.nombre}? El historial de entregas que ya se le registraron se conserva, pero quedará sin persona asociada.`)) {
+        try {
+          await deleteDoc(doc(db, "personas_sin_rud", p.id));
+          mostrarToast("Registro eliminado.");
+        } catch (err) {
+          mostrarToast("No se pudo eliminar.", true);
+        }
+      }
+    });
+  });
+}
+
+document.getElementById("buscar-sin-rud").addEventListener("input", renderSinRud);
+
+const formSinRud = document.getElementById("form-sin-rud");
+formSinRud.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const errorEl = formSinRud.querySelector(".form-error");
+  errorEl.hidden = true;
+  const nombre = document.getElementById("sin-rud-nombre").value.trim();
+  if (!nombre) {
+    errorEl.textContent = "Escribe el nombre completo.";
+    errorEl.hidden = false;
+    return;
+  }
+  try {
+    await addDoc(collection(db, "personas_sin_rud"), {
+      nombre,
+      cedula: document.getElementById("sin-rud-cedula").value.trim(),
+      rud: document.getElementById("sin-rud-rud").value.trim(),
+      fechaRegistro: serverTimestamp(),
+      registradoPor: auth.currentUser.email,
+    });
+    mostrarToast("Persona registrada.");
+    formSinRud.reset();
+    cerrarModal("modal-sin-rud");
+  } catch (err) {
+    errorEl.textContent = "No se pudo guardar. Intenta de nuevo.";
+    errorEl.hidden = false;
+  }
+});
 
 // ============================================================
 // IMPORTAR NÚCLEO FAMILIAR DESDE EXCEL
@@ -1225,6 +1369,235 @@ inputExcelInventario.addEventListener("change", async (e) => {
     mostrarToast("No se pudo leer el archivo. Verifica que sea un Excel o CSV válido.", true);
   } finally {
     inputExcelInventario.value = "";
+  }
+});
+
+// ============================================================
+// IMPORTAR ENTREGAS YA REALIZADAS (formato ancho: Nombre, Cedula, RUD,
+// y una columna por cada artículo con la cantidad entregada a esa persona)
+// ============================================================
+const btnImportarEntregas = document.getElementById("btn-importar-entregas");
+const inputExcelEntregas = document.getElementById("input-excel-entregas");
+
+btnImportarEntregas.addEventListener("click", () => inputExcelEntregas.click());
+
+inputExcelEntregas.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const libro = XLSX.read(buffer, { type: "array" });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+
+    if (filas.length === 0) {
+      mostrarToast("El archivo no tiene filas de datos.", true);
+      return;
+    }
+
+    // Identifica las columnas fijas (Nombre, Cedula, RUD) y trata TODAS las demás
+    // columnas como artículos, usando el encabezado tal cual como nombre del artículo.
+    const clavesTodas = Object.keys(filas[0]);
+    const clavesFijas = new Set();
+    function marcarClaveFija(opciones) {
+      const encontrada = clavesTodas.find((k) => opciones.includes(normalizarTexto(k)));
+      if (encontrada) clavesFijas.add(encontrada);
+      return encontrada;
+    }
+    const claveNombre = marcarClaveFija(["nombre"]);
+    const claveCedula = marcarClaveFija(["cedula", "cédula", "cc"]);
+    const claveRud = marcarClaveFija(["rud"]);
+    const clavesArticulos = clavesTodas.filter((k) => !clavesFijas.has(k));
+
+    if (!claveNombre || !claveCedula) {
+      mostrarToast('El archivo debe tener columnas "Nombre" y "Cedula".', true);
+      return;
+    }
+    if (clavesArticulos.length === 0) {
+      mostrarToast("No se encontró ninguna columna de artículos.", true);
+      return;
+    }
+
+    // ---------- Fase 1: analizar el archivo sin escribir nada todavía ----------
+    const damnificadosPorCedula = new Map(
+      damnificados.filter((d) => d.cedula).map((d) => [String(d.cedula).trim(), d])
+    );
+    const familiaresPorDocumento = new Map(
+      familiares.filter((f) => f.numeroDocumento).map((f) => [String(f.numeroDocumento).trim(), f])
+    );
+    const personasSinRudPorCedula = new Map(
+      personasSinRud.filter((p) => p.cedula).map((p) => [String(p.cedula).trim(), p])
+    );
+    const itemsPorNombre = new Map(
+      inventario.map((i) => [normalizarTexto(i.nombre), i])
+    );
+    const personasSinRudNuevasPlan = new Map(); // cedula -> {nombre, cedula, rud}
+    const itemsNuevosPlan = new Map(); // nombreNormalizado -> nombreOriginal
+    const totalPorItem = new Map(); // nombreNormalizado -> cantidad total a descontar
+    const entregasPlan = []; // { tipoBeneficiario, claveBeneficiario, entregadoNombre, entregadoDocumento, entregadoParentesco, itemClave, itemNombreOriginal, cantidad }
+
+    let contadorDirectos = 0;
+    let contadorPorNucleo = 0;
+    let contadorSinRud = 0;
+
+    filas.forEach((fila) => {
+      const nombre = String(fila[claveNombre] ?? "").trim();
+      const cedula = String(fila[claveCedula] ?? "").trim();
+      const rud = claveRud ? String(fila[claveRud] ?? "").trim() : "";
+      if (!nombre && !cedula) return; // fila vacía
+
+      // Cantidades de esta fila (se calculan una sola vez, se usan sea cual sea el tipo de beneficiario)
+      const cantidadesFila = clavesArticulos
+        .map((clave) => ({ clave, cantidad: Number(fila[clave]) }))
+        .filter((c) => c.cantidad && c.cantidad > 0);
+      if (cantidadesFila.length === 0) return; // fila sin ninguna entrega
+
+      let tipoBeneficiario, claveBeneficiario, entregadoNombre, entregadoDocumento, entregadoParentesco;
+
+      if (cedula && damnificadosPorCedula.has(cedula)) {
+        // 1) Es damnificado directamente
+        const d = damnificadosPorCedula.get(cedula);
+        tipoBeneficiario = "damnificado";
+        claveBeneficiario = String(d.cedula).trim();
+        entregadoNombre = nombre || d.nombre;
+        entregadoDocumento = cedula;
+        entregadoParentesco = "Jefe de hogar";
+        contadorDirectos++;
+      } else if (cedula && familiaresPorDocumento.has(cedula)) {
+        // 2) Pertenece al núcleo familiar de un damnificado ya registrado
+        const f = familiaresPorDocumento.get(cedula);
+        const jefe = damnificados.find((d) => numeroRud(d.rud) === f.formularioNum);
+        if (jefe) {
+          tipoBeneficiario = "damnificado";
+          claveBeneficiario = String(jefe.cedula).trim();
+          entregadoNombre = nombre || f.nombreCompleto;
+          entregadoDocumento = cedula;
+          entregadoParentesco = f.parentesco || "Familiar";
+          contadorPorNucleo++;
+        }
+      }
+
+      if (!tipoBeneficiario) {
+        // 3) No es damnificado ni pertenece a un núcleo familiar registrado → Personas sin RUD
+        tipoBeneficiario = "sin_rud";
+        claveBeneficiario = cedula || `sin-cedula:${nombre}`;
+        entregadoNombre = nombre || "(sin nombre)";
+        entregadoDocumento = cedula;
+        entregadoParentesco = "Sin RUD ni núcleo asociado";
+        contadorSinRud++;
+        if (!personasSinRudPorCedula.has(claveBeneficiario) && !personasSinRudNuevasPlan.has(claveBeneficiario)) {
+          personasSinRudNuevasPlan.set(claveBeneficiario, { nombre: entregadoNombre, cedula, rud });
+        }
+      }
+
+      cantidadesFila.forEach(({ clave, cantidad }) => {
+        const itemClave = normalizarTexto(clave);
+        if (!itemsPorNombre.has(itemClave) && !itemsNuevosPlan.has(itemClave)) {
+          itemsNuevosPlan.set(itemClave, clave.trim());
+        }
+        totalPorItem.set(itemClave, (totalPorItem.get(itemClave) || 0) + cantidad);
+        entregasPlan.push({
+          tipoBeneficiario, claveBeneficiario, entregadoNombre, entregadoDocumento, entregadoParentesco,
+          itemClave, itemNombreOriginal: clave.trim(), cantidad,
+        });
+      });
+    });
+
+    if (entregasPlan.length === 0) {
+      mostrarToast("No se encontró ninguna cantidad mayor a cero en las columnas de artículos.", true);
+      return;
+    }
+
+    const resumenTexto =
+      `Filas identificadas como damnificado directo: ${contadorDirectos}\n` +
+      `Filas identificadas por núcleo familiar de un damnificado: ${contadorPorNucleo}\n` +
+      `Filas sin RUD ni núcleo asociado: ${contadorSinRud}\n` +
+      `Personas nuevas a crear en "Personas sin RUD": ${personasSinRudNuevasPlan.size}\n` +
+      `Artículos nuevos a crear en inventario: ${itemsNuevosPlan.size}\n` +
+      `Registros de entrega a crear: ${entregasPlan.length}\n` +
+      `Se descontará del stock actual de cada artículo (puede quedar en negativo si el stock registrado no alcanza).`;
+
+    if (!confirm(`Vas a importar entregas ya realizadas:\n\n${resumenTexto}\n\n¿Continuar?`)) {
+      inputExcelEntregas.value = "";
+      return;
+    }
+
+    mostrarToast("Importando entregas, esto puede tardar unos segundos…");
+
+    // ---------- Fase 2: crear personas nuevas en "Personas sin RUD" ----------
+    const mapaSinRud = new Map(personasSinRudPorCedula);
+    for (const [clave, datos] of personasSinRudNuevasPlan) {
+      const ref = await addDoc(collection(db, "personas_sin_rud"), {
+        nombre: datos.nombre,
+        cedula: datos.cedula,
+        rud: datos.rud,
+        fechaRegistro: serverTimestamp(),
+        registradoPor: auth.currentUser.email,
+      });
+      mapaSinRud.set(clave, { id: ref.id, nombre: datos.nombre, cedula: datos.cedula, rud: datos.rud });
+    }
+
+    // ---------- Fase 3: crear artículos nuevos en inventario ----------
+    const mapaItems = new Map(itemsPorNombre);
+    for (const [clave, nombreOriginal] of itemsNuevosPlan) {
+      const ref = await addDoc(collection(db, "inventario"), {
+        categoria: "material",
+        nombre: nombreOriginal,
+        unidad: "unidad",
+        stock: 0,
+      });
+      mapaItems.set(clave, { id: ref.id, categoria: "material", nombre: nombreOriginal, unidad: "unidad", stock: 0 });
+    }
+
+    // ---------- Fase 4: descontar el stock de cada artículo (una sola vez por artículo) ----------
+    for (const [clave, cantidadTotal] of totalPorItem) {
+      const item = mapaItems.get(clave);
+      await updateDoc(doc(db, "inventario", item.id), { stock: (item.stock || 0) - cantidadTotal });
+    }
+
+    // ---------- Fase 5: crear los registros de entrega (movimientos) ----------
+    const LOTE = 400;
+    for (let i = 0; i < entregasPlan.length; i += LOTE) {
+      const batch = writeBatch(db);
+      entregasPlan.slice(i, i + LOTE).forEach((p) => {
+        const item = mapaItems.get(p.itemClave);
+        if (!item) return;
+
+        let datosBeneficiario = null;
+        if (p.tipoBeneficiario === "damnificado") {
+          const dam = damnificadosPorCedula.get(p.claveBeneficiario);
+          if (!dam) return;
+          datosBeneficiario = { damnificadoId: dam.id, damnificadoNombre: dam.nombre, damnificadoCedula: dam.cedula };
+        } else {
+          const persona = mapaSinRud.get(p.claveBeneficiario);
+          if (!persona) return;
+          datosBeneficiario = { personaSinRudId: persona.id, personaSinRudNombre: persona.nombre, personaSinRudCedula: persona.cedula || "" };
+        }
+
+        batch.set(doc(collection(db, "movimientos")), {
+          tipo: "salida",
+          categoria: item.categoria,
+          itemId: item.id,
+          itemNombre: item.nombre,
+          cantidad: p.cantidad,
+          ...datosBeneficiario,
+          entregadoNombre: p.entregadoNombre,
+          entregadoDocumento: p.entregadoDocumento,
+          entregadoParentesco: p.entregadoParentesco,
+          fecha: serverTimestamp(),
+          responsable: auth.currentUser.email,
+        });
+      });
+      await batch.commit();
+    }
+
+    mostrarToast(`Listo: ${personasSinRudNuevasPlan.size} personas nuevas sin RUD, ${itemsNuevosPlan.size} artículos nuevos, ${entregasPlan.length} entregas registradas.`);
+  } catch (err) {
+    console.error(err);
+    mostrarToast("No se pudo procesar el archivo. Revisa que tenga columnas Nombre, Cedula, RUD y una columna por artículo.", true);
+  } finally {
+    inputExcelEntregas.value = "";
   }
 });
 
@@ -1622,9 +1995,9 @@ btnExportarExcel.addEventListener("click", () => {
         Tipo: m.tipo === "entrada" ? "Entrada" : "Salida",
         Categoria: etiquetaCategoria(m.categoria),
         Articulo: m.itemNombre || "", Cantidad: m.cantidad || 0,
-        "Entregado a": m.tipo === "salida" ? (m.entregadoNombre || m.damnificadoNombre || "") : "",
+        "Entregado a": m.tipo === "salida" ? (m.entregadoNombre || m.damnificadoNombre || m.personaSinRudNombre || "") : "",
         Parentesco: m.tipo === "salida" ? (m.entregadoParentesco || "") : "",
-        "RUD del hogar": hogar ? hogar.rud : "",
+        "RUD del hogar": hogar ? hogar.rud : (m.personaSinRudId ? "SIN RUD" : ""),
         Responsable: m.responsable || "",
       };
     });
