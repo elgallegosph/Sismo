@@ -500,6 +500,7 @@ formItem.addEventListener("submit", async (e) => {
       await addDoc(collection(db, "inventario"), {
         ...datos,
         stock: Number(document.getElementById("item-stock").value) || 0,
+        totalRecibido: Number(document.getElementById("item-stock").value) || 0,
       });
       mostrarToast("Artículo agregado al inventario.");
     }
@@ -539,17 +540,21 @@ function renderInventario() {
   renderTablaInventario("kit", "tabla-inventario-kit");
 }
 
+document.getElementById("buscar-inventario").addEventListener("input", renderInventario);
+
 function renderTablaInventario(categoria, tbodyId) {
   const tbody = document.getElementById(tbodyId);
-  const items = inventario.filter((i) => i.categoria === categoria);
+  const filtro = document.getElementById("buscar-inventario").value.trim().toLowerCase();
+  const items = inventario.filter((i) => i.categoria === categoria && (!filtro || i.nombre.toLowerCase().includes(filtro)));
   if (items.length === 0) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="4">Sin artículos todavía.</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5">${filtro ? "Ningún artículo coincide con esa búsqueda." : "Sin artículos todavía."}</td></tr>`;
     return;
   }
   tbody.innerHTML = items.map((i) => `
     <tr>
       <td>${escapeHtml(i.nombre)}</td>
       <td>${escapeHtml(i.unidad)}</td>
+      <td>${(i.totalRecibido ?? i.stock ?? 0)}</td>
       <td>${i.stock <= 0 ? `<span class="badge badge-low">0 — agotado</span>` : i.stock}</td>
       <td>
         ${(rolActual === "admin" || rolActual === "inventario") ? `<button class="btn btn-ghost btn-small" data-editar-item="${i.id}">Editar</button>` : ""}
@@ -614,7 +619,8 @@ formEntrada.addEventListener("submit", async (e) => {
       const itemRef = doc(db, "inventario", itemId);
       const itemSnap = await tx.get(itemRef);
       const stockActual = itemSnap.data().stock || 0;
-      tx.update(itemRef, { stock: stockActual + cantidad });
+      const totalRecibidoActual = itemSnap.data().totalRecibido ?? stockActual;
+      tx.update(itemRef, { stock: stockActual + cantidad, totalRecibido: totalRecibidoActual + cantidad });
       tx.set(doc(collection(db, "movimientos")), {
         tipo: "entrada",
         categoria: item.categoria,
@@ -962,9 +968,14 @@ async function eliminarMovimiento(id) {
 
       if (itemSnap.exists()) {
         const stockActual = itemSnap.data().stock || 0;
-        // Si era una salida, se le devuelve la cantidad al inventario; si era una entrada, se le resta.
-        const nuevoStock = m.tipo === "salida" ? stockActual + m.cantidad : stockActual - m.cantidad;
-        tx.update(itemRef, { stock: nuevoStock });
+        const totalRecibidoActual = itemSnap.data().totalRecibido ?? stockActual;
+        // Si era una salida, se le devuelve la cantidad al inventario; si era una entrada, se le resta
+        // (y también se le resta al total recibido, ya que esa entrada nunca debió contar).
+        if (m.tipo === "salida") {
+          tx.update(itemRef, { stock: stockActual + m.cantidad });
+        } else {
+          tx.update(itemRef, { stock: stockActual - m.cantidad, totalRecibido: totalRecibidoActual - m.cantidad });
+        }
       }
       tx.delete(movRef);
     });
@@ -1410,9 +1421,14 @@ inputExcelInventario.addEventListener("change", async (e) => {
         (i) => i.categoria === r.categoria && normalizarTexto(i.nombre) === normalizarTexto(r.nombre)
       );
       if (existente) {
+        const totalRecibidoExistente = existente.totalRecibido ?? existente.stock ?? 0;
+        const diferencia = r.stock - (existente.stock || 0);
         await updateDoc(doc(db, "inventario", existente.id), {
           stock: r.stock,
           unidad: r.unidad || existente.unidad,
+          // Si la cantidad importada es mayor a la que había, la diferencia se suma también
+          // al total recibido (se asume que esa diferencia llegó como una entrada nueva).
+          totalRecibido: diferencia > 0 ? totalRecibidoExistente + diferencia : totalRecibidoExistente,
         });
         actualizados++;
       } else {
@@ -1421,6 +1437,7 @@ inputExcelInventario.addEventListener("change", async (e) => {
           nombre: r.nombre,
           unidad: r.unidad,
           stock: r.stock,
+          totalRecibido: r.stock,
         });
         creados++;
       }
@@ -1609,8 +1626,9 @@ inputExcelEntregas.addEventListener("change", async (e) => {
         nombre: nombreOriginal,
         unidad: "unidad",
         stock: 0,
+        totalRecibido: 0,
       });
-      mapaItems.set(clave, { id: ref.id, categoria: "material", nombre: nombreOriginal, unidad: "unidad", stock: 0 });
+      mapaItems.set(clave, { id: ref.id, categoria: "material", nombre: nombreOriginal, unidad: "unidad", stock: 0, totalRecibido: 0 });
     }
 
     // ---------- Fase 4: descontar el stock de cada artículo (una sola vez por artículo) ----------
