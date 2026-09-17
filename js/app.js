@@ -641,7 +641,6 @@ document.getElementById("btn-recalcular-stock").addEventListener("click", async 
     mostrarToast("No se pudo recalcular el stock.", true);
   }
 });
-}
 
 // ============================================================
 // MOVIMIENTOS: ENTRADA
