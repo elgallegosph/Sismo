@@ -51,6 +51,7 @@
         <button class="nav-item" data-panel="panel-movimientos">Entradas y salidas</button>
         <button class="nav-item" data-panel="panel-reportes">Entregas por persona</button>
         <button class="nav-item" data-panel="panel-nucleo">Núcleo familiar</button>
+        <button class="nav-item" data-panel="panel-sin-rud">Personas sin RUD</button>
         <button class="nav-item" data-panel="panel-informes">Informes</button>
       </nav>
       <div class="sidebar-bottom">
@@ -213,9 +214,11 @@
             <p class="panel-hint">Toda salida queda asociada a un damnificado.</p>
           </div>
           <div class="header-actions">
+            <button class="btn btn-secondary" id="btn-importar-entregas">Importar entregas ya realizadas (Excel)</button>
             <button class="btn btn-secondary" id="btn-registrar-entrada" data-open-modal="modal-entrada">Registrar entrada</button>
             <button class="btn btn-primary" id="btn-registrar-salida" data-open-modal="modal-salida">Registrar entrega (salida)</button>
           </div>
+          <input type="file" id="input-excel-entregas" accept=".xlsx,.xls,.csv" hidden />
         </header>
 
         <div class="table-wrap">
@@ -271,6 +274,38 @@
 
         <div id="nucleo-resultado" class="reporte-resultado">
           <p class="empty-state">Escribe un nombre, cédula, RUD o número de formulario para ver el núcleo familiar.</p>
+        </div>
+      </section>
+
+      <!-- ---------- PERSONAS SIN RUD ---------- -->
+      <section id="panel-sin-rud" class="panel">
+        <header class="panel-header">
+          <div>
+            <h2>Personas sin RUD</h2>
+            <p class="panel-hint">Personas que recibieron entregas pero no tienen RUD ni pertenecen al núcleo familiar de ningún damnificado registrado.</p>
+          </div>
+          <button class="btn btn-primary" id="btn-registrar-sin-rud" data-open-modal="modal-sin-rud">Registrar persona</button>
+        </header>
+
+        <input type="search" id="buscar-sin-rud" class="search-input" placeholder="Buscar por nombre, cédula o RUD…" />
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Cédula</th>
+                <th>RUD</th>
+                <th>Mercados</th>
+                <th>Materiales</th>
+                <th>Kits de aseo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-sin-rud">
+              <tr class="empty-row"><td colspan="7">Cargando registros…</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -423,6 +458,8 @@
         </label>
         <div id="salida-damnificado-resultados" class="autocomplete-results"></div>
         <input type="hidden" id="salida-damnificado-id" required />
+        <input type="hidden" id="salida-tipo-beneficiario" />
+        <input type="hidden" id="salida-persona-sin-rud-id" />
         <input type="hidden" id="salida-entregado-nombre" />
         <input type="hidden" id="salida-entregado-documento" />
         <input type="hidden" id="salida-entregado-parentesco" />
@@ -449,6 +486,22 @@
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
           <button type="submit" class="btn btn-primary">Registrar entrega</button>
+        </div>
+        <p class="form-error" hidden></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-sin-rud" hidden>
+    <div class="modal">
+      <h3>Registrar persona sin RUD</h3>
+      <form id="form-sin-rud" class="modal-form">
+        <label>Nombre completo <input type="text" id="sin-rud-nombre" required /></label>
+        <label>Cédula <input type="text" id="sin-rud-cedula" /></label>
+        <label>RUD / observación <input type="text" id="sin-rud-rud" placeholder="Ej: SIN RUD, INSTITUCIONAL…" /></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-close-modal>Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
         </div>
         <p class="form-error" hidden></p>
       </form>
