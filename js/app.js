@@ -1712,6 +1712,22 @@ function renderDashboard() {
   document.getElementById("op-entregas-kit").textContent = entregasKit.toLocaleString("es-CO");
   document.getElementById("op-agotados").textContent = agotados.toLocaleString("es-CO");
 
+  // ---------- Disponible por categoría (stock actual menos lo entregado) ----------
+  const stockMercado = inventario.filter((i) => i.categoria === "mercado").reduce((acc, i) => acc + num(i.stock), 0);
+  const stockMaterial = inventario.filter((i) => i.categoria === "material").reduce((acc, i) => acc + num(i.stock), 0);
+  const stockKit = inventario.filter((i) => i.categoria === "kit").reduce((acc, i) => acc + num(i.stock), 0);
+
+  const unidadesEntregadasMercado = movimientos.filter((m) => m.tipo === "salida" && m.categoria === "mercado").reduce((acc, m) => acc + num(m.cantidad), 0);
+  const unidadesEntregadasMaterial = movimientos.filter((m) => m.tipo === "salida" && m.categoria === "material").reduce((acc, m) => acc + num(m.cantidad), 0);
+  const unidadesEntregadasKit = movimientos.filter((m) => m.tipo === "salida" && m.categoria === "kit").reduce((acc, m) => acc + num(m.cantidad), 0);
+
+  document.getElementById("disp-mercado").textContent = stockMercado.toLocaleString("es-CO");
+  document.getElementById("disp-material").textContent = stockMaterial.toLocaleString("es-CO");
+  document.getElementById("disp-kit").textContent = stockKit.toLocaleString("es-CO");
+  document.getElementById("disp-entregado-mercado").textContent = unidadesEntregadasMercado.toLocaleString("es-CO");
+  document.getElementById("disp-entregado-material").textContent = unidadesEntregadasMaterial.toLocaleString("es-CO");
+  document.getElementById("disp-entregado-kit").textContent = unidadesEntregadasKit.toLocaleString("es-CO");
+
   // ---------- Tabla de concordancia ----------
   const filasConcordancia = [
     { etiqueta: "Familias", importado: resumen ? num(resumen.familias) : null, calculado: totalDamnificados },
@@ -1766,9 +1782,6 @@ function renderDashboard() {
     options: { responsive: true, maintainAspectRatio: false },
   });
 
-  const stockMercado = inventario.filter((i) => i.categoria === "mercado").reduce((acc, i) => acc + num(i.stock), 0);
-  const stockMaterial = inventario.filter((i) => i.categoria === "material").reduce((acc, i) => acc + num(i.stock), 0);
-  const stockKit = inventario.filter((i) => i.categoria === "kit").reduce((acc, i) => acc + num(i.stock), 0);
   if (chartInventario) chartInventario.destroy();
   chartInventario = new Chart(document.getElementById("chart-inventario"), {
     type: "bar",
