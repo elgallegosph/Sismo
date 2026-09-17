@@ -201,6 +201,7 @@ function iniciarListeners() {
   onSnapshot(collection(db, "personas_sin_rud"), (snap) => {
     personasSinRud = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderSinRud();
+    renderReporteSiHayBusqueda();
   });
 }
 
@@ -988,6 +989,39 @@ function formatRecibio(m, damnificadoPrincipal) {
   return partes.length ? `${nombre} (${partes.join(", ")})` : nombre;
 }
 
+function tarjetaEntregas(nombre, subtitulo, historial, conteos) {
+  return `
+    <div class="reporte-persona">
+      <h3>${escapeHtml(nombre)}</h3>
+      <p>${subtitulo}</p>
+      <div class="reporte-counts">
+        <div class="count-card"><div class="n">${conteos.mercado}</div><div class="label">Entregas de mercado</div></div>
+        <div class="count-card"><div class="n">${conteos.material}</div><div class="label">Entregas de materiales</div></div>
+        <div class="count-card"><div class="n">${conteos.kit}</div><div class="label">Entregas de kits de aseo</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Fecha</th><th>Categoría</th><th>Artículo</th><th>Cantidad</th><th>Recibió</th><th>Responsable</th></tr></thead>
+          <tbody>
+            ${historial.length === 0
+              ? `<tr class="empty-row"><td colspan="6">Todavía no ha recibido entregas.</td></tr>`
+              : historial.map((m) => `
+                  <tr>
+                    <td>${formatearFecha(m.fecha)}</td>
+                    <td>${etiquetaCategoria(m.categoria)}</td>
+                    <td>${escapeHtml(m.itemNombre)}</td>
+                    <td>${m.cantidad}</td>
+                    <td>${escapeHtml(formatRecibio(m, { nombre }))}</td>
+                    <td>${escapeHtml(m.responsable || "—")}</td>
+                  </tr>
+                `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 function renderReporteSiHayBusqueda() {
   const filtro = buscarReporteInput.value.trim().toLowerCase();
   const contenedor = document.getElementById("reporte-resultado");
@@ -995,47 +1029,41 @@ function renderReporteSiHayBusqueda() {
     contenedor.innerHTML = `<p class="empty-state">Escribe un nombre, cédula o RUD para ver su historial de entregas.</p>`;
     return;
   }
-  const coincidencias = damnificados.filter((d) => coincideBusqueda(d, filtro));
-  if (coincidencias.length === 0) {
-    contenedor.innerHTML = `<p class="empty-state">Nadie coincide con esa búsqueda.</p>`;
-    return;
-  }
-  contenedor.innerHTML = coincidencias.map((d) => {
+
+  const bloques = [];
+
+  damnificados.filter((d) => coincideBusqueda(d, filtro)).forEach((d) => {
     const entregasMercado = movimientos.filter((m) => m.tipo === "salida" && m.damnificadoId === d.id && m.categoria === "mercado");
     const entregasMaterial = movimientos.filter((m) => m.tipo === "salida" && m.damnificadoId === d.id && m.categoria === "material");
     const entregasKit = movimientos.filter((m) => m.tipo === "salida" && m.damnificadoId === d.id && m.categoria === "kit");
     const historial = [...entregasMercado, ...entregasMaterial, ...entregasKit].sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
-    return `
-      <div class="reporte-persona">
-        <h3>${escapeHtml(d.nombre)}</h3>
-        <p>CC ${escapeHtml(d.cedula)} · RUD ${escapeHtml(d.rud)}</p>
-        <div class="reporte-counts">
-          <div class="count-card"><div class="n">${entregasMercado.length}</div><div class="label">Entregas de mercado</div></div>
-          <div class="count-card"><div class="n">${entregasMaterial.length}</div><div class="label">Entregas de materiales</div></div>
-          <div class="count-card"><div class="n">${entregasKit.length}</div><div class="label">Entregas de kits de aseo</div></div>
-        </div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>Fecha</th><th>Categoría</th><th>Artículo</th><th>Cantidad</th><th>Recibió</th><th>Responsable</th></tr></thead>
-            <tbody>
-              ${historial.length === 0
-                ? `<tr class="empty-row"><td colspan="6">Todavía no ha recibido entregas.</td></tr>`
-                : historial.map((m) => `
-                    <tr>
-                      <td>${formatearFecha(m.fecha)}</td>
-                      <td>${etiquetaCategoria(m.categoria)}</td>
-                      <td>${escapeHtml(m.itemNombre)}</td>
-                      <td>${m.cantidad}</td>
-                      <td>${escapeHtml(formatRecibio(m, d))}</td>
-                      <td>${escapeHtml(m.responsable || "—")}</td>
-                    </tr>
-                  `).join("")}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }).join("<hr style='margin:1.5rem 0;border:none;border-top:1px solid var(--color-border)'>");
+    bloques.push(tarjetaEntregas(
+      d.nombre,
+      `CC ${escapeHtml(d.cedula)} · RUD ${escapeHtml(d.rud)}`,
+      historial,
+      { mercado: entregasMercado.length, material: entregasMaterial.length, kit: entregasKit.length }
+    ));
+  });
+
+  personasSinRud.filter((p) => coincideBusquedaSinRud(p, filtro)).forEach((p) => {
+    const entregasMercado = movimientos.filter((m) => m.tipo === "salida" && m.personaSinRudId === p.id && m.categoria === "mercado");
+    const entregasMaterial = movimientos.filter((m) => m.tipo === "salida" && m.personaSinRudId === p.id && m.categoria === "material");
+    const entregasKit = movimientos.filter((m) => m.tipo === "salida" && m.personaSinRudId === p.id && m.categoria === "kit");
+    const historial = [...entregasMercado, ...entregasMaterial, ...entregasKit].sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
+    bloques.push(tarjetaEntregas(
+      p.nombre,
+      `${p.cedula ? `CC ${escapeHtml(p.cedula)} · ` : ""}Sin RUD ni núcleo familiar asociado`,
+      historial,
+      { mercado: entregasMercado.length, material: entregasMaterial.length, kit: entregasKit.length }
+    ));
+  });
+
+  if (bloques.length === 0) {
+    contenedor.innerHTML = `<p class="empty-state">Nadie coincide con esa búsqueda.</p>`;
+    return;
+  }
+
+  contenedor.innerHTML = bloques.join("<hr style='margin:1.5rem 0;border:none;border-top:1px solid var(--color-border)'>");
 }
 
 // ============================================================
