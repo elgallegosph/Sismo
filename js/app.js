@@ -923,7 +923,7 @@ function formatEntregadoA(m) {
 function renderMovimientos() {
   const tbody = document.getElementById("tabla-movimientos");
   if (movimientos.length === 0) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Todavía no hay movimientos registrados.</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">Todavía no hay movimientos registrados.</td></tr>`;
     return;
   }
   tbody.innerHTML = movimientos.map((m) => `
@@ -935,8 +935,43 @@ function renderMovimientos() {
       <td>${m.cantidad}</td>
       <td>${m.tipo === "salida" ? escapeHtml(formatEntregadoA(m)) : "—"}</td>
       <td>${escapeHtml(m.responsable || "—")}</td>
+      <td>${rolActual === "admin" ? `<button class="btn btn-ghost btn-small" data-eliminar-movimiento="${m.id}">Eliminar</button>` : ""}</td>
     </tr>
   `).join("");
+
+  tbody.querySelectorAll("[data-eliminar-movimiento]").forEach((btn) => {
+    btn.addEventListener("click", () => eliminarMovimiento(btn.dataset.eliminarMovimiento));
+  });
+}
+
+async function eliminarMovimiento(id) {
+  const m = movimientos.find((x) => x.id === id);
+  if (!m) return;
+
+  const descripcion = `${m.tipo === "entrada" ? "Entrada" : "Salida"} de ${m.cantidad} ${etiquetaCategoria(m.categoria)} — ${m.itemNombre}`;
+  if (!confirm(`¿Eliminar este movimiento?\n\n${descripcion}\n\nEsto también ajusta el stock del artículo para revertir el efecto de este movimiento.`)) {
+    return;
+  }
+
+  try {
+    await runTransaction(db, async (tx) => {
+      const movRef = doc(db, "movimientos", id);
+      const itemRef = doc(db, "inventario", m.itemId);
+      const itemSnap = await tx.get(itemRef);
+
+      if (itemSnap.exists()) {
+        const stockActual = itemSnap.data().stock || 0;
+        // Si era una salida, se le devuelve la cantidad al inventario; si era una entrada, se le resta.
+        const nuevoStock = m.tipo === "salida" ? stockActual + m.cantidad : stockActual - m.cantidad;
+        tx.update(itemRef, { stock: nuevoStock });
+      }
+      tx.delete(movRef);
+    });
+    mostrarToast("Movimiento eliminado y stock ajustado.");
+  } catch (err) {
+    console.error(err);
+    mostrarToast("No se pudo eliminar el movimiento.", true);
+  }
 }
 
 // ============================================================
